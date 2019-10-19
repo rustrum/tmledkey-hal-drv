@@ -53,7 +53,7 @@ load
 #break stm32_blue_pill_rust::main
 
 # Run the program and stop at the main() function.
-#continue
+continue
 
 # Remove the breakpoint at the main() function.
 #clear stm32_blue_pill_rust::main

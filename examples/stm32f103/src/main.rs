@@ -15,7 +15,7 @@ use stm32f1xx_hal::{
 };
 
 use dht_hal_drv::{dht_read, dht_split_init, dht_split_read, DhtError, DhtType, DhtValue};
-use embedded_hal::digital::v2::{OutputPin, InputPin};
+use embedded_hal::digital::v2::{InputPin, OutputPin};
 
 use tmledkey_hal_drv::*;
 
@@ -58,21 +58,45 @@ fn main() -> ! {
     let mut tm_dio = gpiob.pb7.into_open_drain_output(&mut gpiob.crl);
     // let mut display = TM1637::new(&mut tm_clk, &mut tm_dio, &mut delay);
 
-    let mut bus_delay = || delay.delay_us(25_u16);
+    // let mut bus_delay = || delay.delay_us(5_u16);
 
-    tm_dio.set_high();
+    // bus_delay();
 
-    bus_delay();
+    // hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
+    // bus_delay();
+    // tm_bus_stop(&mut tm_dio, &mut tm_clk, &mut bus_delay);
+    // bus_delay();
+    // for _ in 0..10 {
+    //     bus_delay();
+    // }
+
     hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
 
-    let cmd = tm_send_command(&mut tm_dio, &mut tm_clk, &mut bus_delay, TM_COM_DISPLAY | 0b100);
-    hprintln!("CMD1 {:?}", cmd);
+    for _ in 0..10 {
+        let cmd1 = tm_send_bytes(
+            &mut tm_dio,
+            &mut tm_clk,
+            &mut || delay.delay_us(5_u16),
+            &[TM_COM_DISPLAY | 0b100],
+        );
 
-    let cmd = tm_send_command(&mut tm_dio, &mut tm_clk, &mut bus_delay, TM_COM_ADR | 2);
-    hprintln!("CMD2 {:?}", cmd);
+        delay.delay_ms(100_u32);
 
-    let cmd = tm_send_command(&mut tm_dio, &mut tm_clk, &mut bus_delay, TM_COM_DATA | TM_SEGMENT_1 | TM_SEGMENT_4);
-    hprintln!("CMD3 {:?}", cmd);
+        let cmd2 = tm_send_bytes(
+            &mut tm_dio,
+            &mut tm_clk,
+            &mut || delay.delay_us(5_u16),
+            &[TM_COM_ADR | 0, TM_COM_DATA | TM_SEGMENT_1 | TM_SEGMENT_4],
+        );
+
+        delay.delay_ms(100_u32);
+
+        hprintln!("CMD1 {:?}", cmd1);
+        hprintln!("CMD2 {:?}", cmd2);
+
+        hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
+    }
+
     loop {
         {
             let readings = dht_read(DhtType::DHT11, &mut dht_open_drain, &mut |d| {
