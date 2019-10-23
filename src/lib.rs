@@ -1,6 +1,6 @@
 //#![deny(warnings)]
 //!
-//! More infromation about [7 segment displays](https://en.wikipedia.org/wiki/Seven-segment_display)
+//! More infromation about [7 segment displays](https://en.wikipedia.org/wiki/Seven-SEG_display)
 //!
 //!
 #![no_std]
@@ -8,41 +8,6 @@ use embedded_hal as hal;
 
 use hal::digital::v2::{InputPin, OutputPin};
 //use hal::blocking::delay::DelayUs;
-
-/// Address adding mode (write to display)
-pub const TM_COM_DATA_ADDR_ADDING: u8 = 0b01000000;
-/// Data fix address mode (write to display)
-pub const TM_COM_DATA_ADDR_FIX: u8 = 0b01000100;
-/// Read key scan data
-pub const TM_COM_DATA_READ: u8 = 0b01000010;
-
-/// Register address command mask
-pub const TM_COM_ADR: u8 = 0b11000000;
-
-/// Display ON max brightness.
-/// Can be combined with masked bytes to adjust brightness level
-pub const TM_COM_DISPLAY_ON: u8 = 0b10001000;
-/// Display brightness mask
-pub const TM_DISPLAY_BRIGHTNESS_MASK: u8 = 0b00000111;
-// Display OFF
-pub const TM_COM_DISPLAY_OFF: u8 = 0b10000000;
-
-/// Segment A - top
-pub const TM_SEGMENT_1: u8 = 0b1;
-/// Segment B - top right
-pub const TM_SEGMENT_2: u8 = 0b10;
-/// Segment C - bottom right
-pub const TM_SEGMENT_3: u8 = 0b100;
-/// Segment D - bottom
-pub const TM_SEGMENT_4: u8 = 0b1000;
-/// Segment E - bottom left
-pub const TM_SEGMENT_5: u8 = 0b10000;
-/// Segment F - top left
-pub const TM_SEGMENT_6: u8 = 0b100000;
-/// Segment G - middle
-pub const TM_SEGMENT_7: u8 = 0b1000000;
-/// Segment DP (eight) - dot or colon
-pub const TM_SEGMENT_8: u8 = 0b10000000;
 
 #[derive(Debug)]
 pub enum TmError {
@@ -75,11 +40,7 @@ where
 
 /// Expecting to have initial state on bus CLK is UP and DIO is UP.
 #[inline]
-pub fn tm_bus_start<DIO, CLK, D>(
-    dio: &mut DIO,
-    clk: &mut CLK,
-    bus_delay: &mut D,
-) -> Result<(), TmError>
+fn tm_bus_start<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
@@ -91,11 +52,7 @@ where
 }
 
 #[inline]
-pub fn tm_bus_stop<DIO, CLK, D>(
-    dio: &mut DIO,
-    clk: &mut CLK,
-    bus_delay: &mut D,
-) -> Result<(), TmError>
+fn tm_bus_stop<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
@@ -114,13 +71,12 @@ where
     dio.set_high().map_err(|_| TmError::Dio)?;
     tm_bus_dio_wait_ack(dio, bus_delay, true, 255)?;
     bus_delay();
-
     Ok(())
 }
 
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
-pub fn tm_bus_send<DIO, CLK, D>(
+fn tm_bus_send<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -150,9 +106,9 @@ where
     Ok(())
 }
 
-/// Should be called after
+/// Should be called right after send
 #[inline]
-pub fn tm_bus_ack<DIO, CLK, D>(
+fn tm_bus_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -189,7 +145,7 @@ where
 }
 
 #[inline]
-pub fn tm_bus_send_byte<DIO, CLK, D>(
+fn tm_bus_send_byte<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -206,7 +162,8 @@ where
 }
 
 ///
-/// Send command to microchip using start, send, ack and stop bus sequences.
+/// Send one or several bytes to MCU.
+/// Accoding to datasheet it can be single commad byte or a sequence starting with command byte followed by several data bytes.
 ///
 #[inline]
 pub fn tm_send_bytes<DIO, CLK, D>(
@@ -239,3 +196,136 @@ where
         stop
     }
 }
+
+/// Address adding mode (write to display)
+pub const COM_DATA_ADDRESS_ADD: u8 = 0b01000000;
+/// Data fix address mode (write to display)
+pub const COM_DATA_ADDRESS_FIXED: u8 = 0b01000100;
+/// Read key scan data
+pub const COM_DATA_READ: u8 = 0b01000010;
+
+/// Register address command mask
+pub const COM_ADDRESS: u8 = 0b11000000;
+
+/// Display ON max brightness.
+/// Can be combined with masked bytes to adjust brightness level
+pub const COM_DISPLAY_ON: u8 = 0b10001000;
+/// Display brightness mask
+pub const DISPLAY_BRIGHTNESS_MASK: u8 = 0b00000111;
+// Display OFF
+pub const COM_DISPLAY_OFF: u8 = 0b10000000;
+
+/// Segment A - top
+pub const SEG_1: u8 = 0b1;
+/// Segment B - top right
+pub const SEG_2: u8 = 0b10;
+/// Segment C - bottom right
+pub const SEG_3: u8 = 0b100;
+/// Segment D - bottom
+pub const SEG_4: u8 = 0b1000;
+/// Segment E - bottom left
+pub const SEG_5: u8 = 0b10000;
+/// Segment F - top left
+pub const SEG_6: u8 = 0b100000;
+/// Segment G - middle
+pub const SEG_7: u8 = 0b1000000;
+/// Segment DP (eight) - dot or colon
+pub const SEG_8: u8 = 0b10000000;
+
+pub const CHAR_0: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_1: u8 = SEG_2 | SEG_3;
+pub const CHAR_2: u8 = SEG_1 | SEG_2 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_3: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_4: u8 = SEG_2 | SEG_3 | SEG_6 | SEG_7;
+pub const CHAR_5: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_6: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_7: u8 = SEG_1 | SEG_2 | SEG_3;
+pub const CHAR_8: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_9: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_A: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_a: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_b: u8 = SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_C: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_c: u8 = SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_d: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_E: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_e: u8 = SEG_1 | SEG_2 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_F: u8 = SEG_1 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_G: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_g: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_H: u8 = SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_h: u8 = SEG_3 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_I: u8 = SEG_2 | SEG_3;
+pub const CHAR_i: u8 = SEG_3;
+pub const CHAR_J: u8 = SEG_2 | SEG_3 | SEG_4| SEG_5;
+pub const CHAR_L: u8 = SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_l: u8 = SEG_4 | SEG_5;
+pub const CHAR_N: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_5 | SEG_6;
+pub const CHAR_n: u8 = SEG_3 | SEG_5 | SEG_7;
+pub const CHAR_O: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_o: u8 = SEG_3 | SEG_4 | SEG_5 | SEG_7;
+pub const CHAR_P: u8 = SEG_1 | SEG_2 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_q: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_6 | SEG_7;
+pub const CHAR_R: u8 = SEG_1 | SEG_5 | SEG_6;
+pub const CHAR_r: u8 = SEG_5 | SEG_7;
+pub const CHAR_S: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_t: u8 = SEG_4 | SEG_5 | SEG_6 | SEG_7;
+pub const CHAR_U: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_u: u8 = SEG_3 | SEG_4 | SEG_5;
+pub const CHAR_y: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
+pub const CHAR_E_MIRROR: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_DEGREE: u8 = SEG_1 | SEG_2 | SEG_6 | SEG_7;
+pub const CHAR_MINUS: u8 = SEG_7;
+pub const CHAR_UNDERSCORE: u8 = SEG_4;
+pub const CHAR_BRACKET_LEFT: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
+pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
+
+pub const CHARS: [u8; 47] = [
+    CHAR_0,
+    CHAR_1,
+    CHAR_2,
+    CHAR_3,
+    CHAR_4,
+    CHAR_5,
+    CHAR_6,
+    CHAR_7,
+    CHAR_8,
+    CHAR_9,
+    CHAR_A,
+    CHAR_a,
+    CHAR_b,
+    CHAR_C,
+    CHAR_c,
+    CHAR_d,
+    CHAR_E,
+    CHAR_e,
+    CHAR_F,
+    CHAR_G,
+    CHAR_g,
+    CHAR_H,
+    CHAR_h,
+    CHAR_I,
+    CHAR_i,
+    CHAR_J,
+    CHAR_L,
+    CHAR_l,
+    CHAR_N,
+    CHAR_n,
+    CHAR_O,
+    CHAR_o,
+    CHAR_P,
+    CHAR_q,
+    CHAR_R,
+    CHAR_r,
+    CHAR_S,
+    CHAR_t,
+    CHAR_U,
+    CHAR_u,
+    CHAR_y,
+    CHAR_E_MIRROR,
+    CHAR_DEGREE,
+    CHAR_MINUS,
+    CHAR_UNDERSCORE,
+    CHAR_BRACKET_LEFT,
+    CHAR_BRACKET_RIGHT,
+];

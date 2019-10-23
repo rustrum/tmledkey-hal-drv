@@ -162,49 +162,32 @@ fn main() {
 
     println!("Display starts");
 
-    let r = tm::tm_send_bytes(&mut diopin, &mut clkpin, &mut delayer, &[0x40]);
-    let r = tm::tm_send_bytes(
-        &mut diopin,
-        &mut clkpin,
-        &mut delayer,
-        &[0xc0_u8, 0x3f_u8, 0x3f_u8, 0x3f_u8, 0x3f_u8],
-    );
+    let r = tm::tm_send_bytes(&mut diopin, &mut clkpin, &mut delayer, &[tm::COM_DATA_ADDRESS_ADD]);
     println!("Inited {:?}", r);
 
     let r = tm::tm_send_bytes(
         &mut diopin,
         &mut clkpin,
         &mut delayer,
-        &[tm::TM_COM_DISPLAY_ON | 0x0],
+        &[tm::COM_DISPLAY_ON | 1],
     );
     println!("Birght {:?}", r);
 
-    let mut nums: [u8; 5] = [tm::TM_COM_ADR | 0, 1, 2, 3, 4];
+    let mut nums: [u8; 5] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4];
     loop {
         let mut bts: [u8; 5] = [0; 5];
         bts[0] = nums[0];
         for i in 1..nums.len() {
-            bts[i] = SEGMENTS[(nums[i] as usize % SEGMENTS.len())];
+            bts[i] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
         }
 
         let r = tm::tm_send_bytes(&mut diopin, &mut clkpin, &mut delayer, &bts);
         println!("Printed {:?}", r);
 
-        thread::sleep(time::Duration::from_secs(1));
+        thread::sleep(time::Duration::from_millis(250));
 
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;
         }
     }
 }
-
-const SEGMENTS: [u8; 8] = [
-    tm::TM_SEGMENT_1,
-    tm::TM_SEGMENT_2,
-    tm::TM_SEGMENT_3,
-    tm::TM_SEGMENT_4,
-    tm::TM_SEGMENT_5,
-    tm::TM_SEGMENT_6,
-    tm::TM_SEGMENT_7,
-    tm::TM_SEGMENT_8,
-];
