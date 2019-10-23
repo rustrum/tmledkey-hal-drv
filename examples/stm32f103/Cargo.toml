@@ -9,10 +9,7 @@ doctest = false
 
 [dependencies]
 tmledkey-hal-drv = { version="0.0.1", path  = "../../", features = [] }
-dht-hal-drv = "0.2.0"
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
-void = {version ="1.0.2", default-features = false }
-nb = "0.1.2"
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"
 cortex-m = "0.6.1"

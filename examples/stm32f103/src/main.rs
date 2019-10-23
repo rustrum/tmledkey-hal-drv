@@ -1,4 +1,4 @@
-#![deny(unsafe_code)]
+//#![deny(unsafe_code)]
 #![no_std]
 #![no_main]
 
@@ -13,15 +13,10 @@ use stm32f1xx_hal::{
     pac,
     prelude::*,
 };
-
-use dht_hal_drv::{dht_read, dht_split_init, dht_split_read, DhtError, DhtType, DhtValue};
+//use dht_hal_drv::{dht_read, dht_split_init, dht_split_read, DhtError, DhtType, DhtValue};
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 
-use tmledkey_hal_drv::*;
-
-// Define types for DHT interface
-type DhtHwPin = gpio::gpiob::PB9<Input<Floating>>;
-type DhtHwPinCr = gpio::gpiob::CRH;
+use tmledkey_hal_drv as tm;
 
 #[entry]
 fn main() -> ! {
@@ -50,80 +45,69 @@ fn main() -> ! {
     // let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
     let mut delay = Delay::new(cp.SYST, clocks);
 
-    // DHT pin config
-    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
-    let mut dht_open_drain = gpiob.pb9.into_open_drain_output(&mut gpiob.crh);
 
+    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
     let mut tm_clk = gpiob.pb6.into_push_pull_output(&mut gpiob.crl);
     let mut tm_dio = gpiob.pb7.into_open_drain_output(&mut gpiob.crl);
-    // let mut display = TM1637::new(&mut tm_clk, &mut tm_dio, &mut delay);
 
-    // let mut bus_delay = || delay.delay_us(5_u16);
+    tm_clk.set_high();
+    tm_dio.set_high();
 
-    // bus_delay();
-
-    // hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
-    // bus_delay();
-    // tm_bus_stop(&mut tm_dio, &mut tm_clk, &mut bus_delay);
-    // bus_delay();
-    // for _ in 0..10 {
-    //     bus_delay();
-    // }
 
     hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
 
-    for _ in 0..10 {
-        let cmd1 = tm_send_bytes(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut || delay.delay_us(5_u16),
-            &[TM_COM_DISPLAY | 0b100],
-        );
+    let mut bus_delay = || delay.delay_us(tm::BUS_DELAY_US);
 
-        delay.delay_ms(100_u32);
+    let r = tm::tm_send_bytes(
+        &mut tm_dio,
+        &mut tm_clk,
+        &mut bus_delay,
+        &[tm::COM_DATA_ADDRESS_ADD],
+    );
+    hprintln!("Display initialized: {:?}", r);
 
-        let cmd2 = tm_send_bytes(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut || delay.delay_us(5_u16),
-            &[TM_COM_ADR | 0, TM_COM_DATA | TM_SEGMENT_1 | TM_SEGMENT_4],
-        );
+    let r = tm::tm_send_bytes(
+        &mut tm_dio,
+        &mut tm_clk,
+        &mut bus_delay,
+        &[tm::COM_DISPLAY_ON],
+    );
+    hprintln!("Brightness Init {:?}", r);
 
-        delay.delay_ms(100_u32);
-
-        hprintln!("CMD1 {:?}", cmd1);
-        hprintln!("CMD2 {:?}", cmd2);
-
-        hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
-    }
-
+    let mut nums: [u8; 5] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4];
+    let mut iter = 0;
     loop {
-        {
-            let readings = dht_read(DhtType::DHT11, &mut dht_open_drain, &mut |d| {
-                delay.delay_us(d)
-            });
-            match readings {
-                Ok(res) => {
-                    // Long blinks if everything is OK
-                    led_blink(&mut led, &mut delay, 250);
-                    hprintln!("DHT readins {}C {}%", res.temperature(), res.humidity());
-                }
-                Err(err) => {
-                    // Short blinks on errors
-                    for _ in 0..10 {
-                        led_blink(&mut led, &mut delay, 25);
-                    }
-                    hprintln!("DHT ERROR {:?}", err);
-                }
-            };
-            delay.delay_ms(1_000_u32);
+        let mut bts: [u8; 5] = [0; 5];
+        bts[0] = nums[0];
+        for i in 1..nums.len() {
+            bts[i] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
         }
-    }
-}
 
-fn led_blink<Error>(pin: &mut dyn OutputPin<Error = Error>, delay: &mut Delay, ms: u32) {
-    pin.set_high();
-    delay.delay_ms(ms);
-    pin.set_low();
-    delay.delay_ms(ms);
+        let b = iter % 8;
+        let r = tm::tm_send_bytes(
+            &mut tm_dio,
+            &mut tm_clk,
+            &mut || delay.delay_us(tm::BUS_DELAY_US),
+            &[tm::COM_DISPLAY_ON | iter],
+        );
+
+        let pr = tm::tm_send_bytes(
+            &mut tm_dio,
+            &mut tm_clk,
+            &mut || delay.delay_us(tm::BUS_DELAY_US),
+            &bts,
+        );
+
+        hprintln!("{:?} bright {} {:?}", pr, b, r);
+        delay.delay_ms(250_u16);
+        for i in 1..nums.len() {
+            nums[i] = nums[i] + 1;
+        }
+        if iter % 2 == 0 {
+            led.set_low();
+        } else {
+            led.set_high();
+        }
+        iter += 1;
+    }
 }

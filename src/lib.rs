@@ -28,7 +28,7 @@ where
     DIO: InputPin + OutputPin,
     D: FnMut() -> (),
 {
-    for _ in 0..10 {
+    for _ in 0..5 {
         if expect_high == dio.is_high().map_err(|_| TmError::Dio)? {
             return Ok(());
         }
@@ -197,6 +197,17 @@ where
     }
 }
 
+/// Resonable delay for TM serial protocol.
+///
+/// Probably this value should fit all configurations, but you can adjust it.
+/// Delay value may vary depending on your circuit.
+/// For example adding additional pull up resitor to DIY LED module with TM1637 
+/// would allow to use smaller delay value.
+pub const BUS_DELAY_US: u16 = 500;
+
+/// Lower but sill working delay accroding to my own tests.
+pub const BUS_DELAY_US_FAST: u16 = 350;
+
 /// Address adding mode (write to display)
 pub const COM_DATA_ADDRESS_ADD: u8 = 0b01000000;
 /// Data fix address mode (write to display)
@@ -257,7 +268,7 @@ pub const CHAR_H: u8 = SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_h: u8 = SEG_3 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_I: u8 = SEG_2 | SEG_3;
 pub const CHAR_i: u8 = SEG_3;
-pub const CHAR_J: u8 = SEG_2 | SEG_3 | SEG_4| SEG_5;
+pub const CHAR_J: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5;
 pub const CHAR_L: u8 = SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_l: u8 = SEG_4 | SEG_5;
 pub const CHAR_N: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_5 | SEG_6;
