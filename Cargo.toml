@@ -1,6 +1,6 @@
 [package]
 name = "tmledkey-hal-drv"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Rumato Estorsky"]
 edition = "2018"
 description = "HAL based driver for Titan Micro 7 segment LED controllers and key scanners"
