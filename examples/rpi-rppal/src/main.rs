@@ -158,7 +158,7 @@ fn main() {
     let mut clkpin = OutPin { pin: clk };
     let mut delay = Delayer {};
 
-    let mut delayer = || spin_sleep::sleep(time::Duration::from_micros(350));
+    let mut delayer = || spin_sleep::sleep(time::Duration::from_micros(tm::BUS_DELAY_US_FAST as u64));
 
     println!("Display starts");
 
@@ -169,7 +169,7 @@ fn main() {
         &mut diopin,
         &mut clkpin,
         &mut delayer,
-        &[tm::COM_DISPLAY_ON | 1],
+        &[tm::COM_DISPLAY_ON | 7],
     );
     println!("Birght {:?}", r);
 
@@ -184,7 +184,7 @@ fn main() {
         let r = tm::tm_send_bytes(&mut diopin, &mut clkpin, &mut delayer, &bts);
         println!("Printed {:?}", r);
 
-        thread::sleep(time::Duration::from_millis(250));
+        thread::sleep(time::Duration::from_millis(750));
 
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;

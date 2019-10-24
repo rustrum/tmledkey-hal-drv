@@ -1,10 +1,15 @@
 [package]
 name = "tmledkey-hal-drv"
 version = "0.0.1"
-authors = ["Rumato Estorsky <rumatoest@users.noreply.github.com>"]
+authors = ["Rumato Estorsky"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "HAL based driver for Titan Micro 7 segment LED controllers and key scanners"
+repository = "https://github.com/rust-rum/tmledkey-hal-drv"
+documentation = "https://docs.rs/tmledkey-hal-drv"
+license-file = "LICENSE"
+readme = "README.md"
+categories = ["embedded", "no-std"]
+keywords = ["tm1637", "led", "hal"]
 
 [dependencies]
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
