@@ -12,6 +12,8 @@ use hal::digital::v2::{InputPin, OutputPin};
 #[derive(Debug)]
 pub enum TmError {
     Dio,
+    /// ACK error with tricky code.
+    /// Code could help to get more detaled information about where exactly error occured.
     Ack(u8),
     Clk,
     Empty,
@@ -58,11 +60,7 @@ where
     CLK: OutputPin,
     D: FnMut() -> (),
 {
-    // clk.set_low().map_err(|_| TmError::Clk)?;
-    // bus_delay();
-
     dio.set_low().map_err(|_| TmError::Dio)?;
-    // tm_bus_dio_low_ack(dio, bus_delay, 90)?;
     bus_delay();
 
     clk.set_high().map_err(|_| TmError::Clk)?;
@@ -273,6 +271,48 @@ where
     read
 }
 
+///
+/// Send bytes using 3 wire interface DIO,CLK,STB.
+///
+#[inline]
+pub fn tm_send_bytes_stb<DIO, CLK, STB, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    stb: &mut STB,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+    bytes: &[u8],
+) -> Result<(), TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    STB: OutputPin,
+    D: FnMut(u16) -> (),
+{
+    Ok(())
+}
+
+///
+/// Read *length* of bytes from MCU using 3 wire interface DIO,CLK,STB.
+///
+#[inline]
+pub fn tm_read_bytes_stb<'a, DIO, CLK, STB, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    stb: &mut STB,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+    length: u8,
+) -> Result<&'a [u8], TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    STB: OutputPin,
+    D: FnMut(u16) -> (),
+{
+    Ok(&[0])
+}
+
 /// Resonable delay for TM serial protocol.
 ///
 /// Probably this value should fit all configurations, but you can adjust it.
@@ -366,8 +406,8 @@ pub const CHAR_UNDERSCORE: u8 = SEG_4;
 pub const CHAR_BRACKET_LEFT: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
 
-/// List of number characters. You can addres them by index: NUMBERS[5] stands for "5"
-pub const NUMBERS: [u8; 10] = [
+/// List of numeral characters, just use array index 0-9 to get proper numeral.
+pub const NUMERALS: [u8; 10] = [
     CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
 ];
 
