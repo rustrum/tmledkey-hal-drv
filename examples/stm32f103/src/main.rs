@@ -45,14 +45,12 @@ fn main() -> ! {
     // let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
     let mut delay = Delay::new(cp.SYST, clocks);
 
-
     let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
     let mut tm_clk = gpiob.pb6.into_push_pull_output(&mut gpiob.crl);
     let mut tm_dio = gpiob.pb7.into_open_drain_output(&mut gpiob.crl);
 
     tm_clk.set_high();
     tm_dio.set_high();
-
 
     hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
 
@@ -98,7 +96,15 @@ fn main() -> ! {
             &bts,
         );
 
-        hprintln!("{:?} bright {} {:?}", pr, b, r);
+        let read = tm::tm_read_byte(&mut tm_dio, &mut tm_clk, &mut || {
+            delay.delay_us(tm::BUS_DELAY_US)
+        });
+
+        match read {
+            Ok(byte) => hprintln!("Byte readed: {:04b}_{:04b}", byte>>4,  byte & 0xF),
+            Err(e) => hprintln!("Read error {:?}", e),
+        };
+
         delay.delay_ms(250_u16);
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;

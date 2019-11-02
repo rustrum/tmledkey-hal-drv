@@ -89,6 +89,7 @@ where
 {
     for _ in 0..8 {
         clk.set_low().map_err(|_| TmError::Clk)?;
+        // This delay can be skipped, but data transfer become unstable
         bus_delay();
 
         let high = byte & 0b1 != 0;
@@ -106,6 +107,28 @@ where
     Ok(())
 }
 
+/// Expecting to have delay after start sequence or previous send call
+#[inline]
+fn tm_bus_read<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<u8, TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: FnMut() -> (),
+{
+    let mut byte = 0;
+    for i in 0..8 {
+        clk.set_low().map_err(|_| TmError::Clk)?;
+        bus_delay();
+        // Looks like MCU changes dio at low CLK
+        clk.set_high().map_err(|_| TmError::Clk)?;
+        if dio.is_high().map_err(|_| TmError::Dio)? {
+            byte = byte | 0x80 >> i;
+        }
+        bus_delay();
+    }
+    Ok(byte)
+}
+
 /// Should be called right after send
 #[inline]
 fn tm_bus_ack<DIO, CLK, D>(
@@ -113,6 +136,7 @@ fn tm_bus_ack<DIO, CLK, D>(
     clk: &mut CLK,
     bus_delay: &mut D,
     err_code: u8,
+    verify_last: bool,
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
@@ -139,7 +163,10 @@ where
     bus_delay();
 
     // Ensure DIO was released and now it is up
-    tm_bus_dio_wait_ack(dio, bus_delay, true, err_code + 3)?;
+    if verify_last {
+        // No need to check last ack for reading mode
+        tm_bus_dio_wait_ack(dio, bus_delay, true, err_code + 3)?;
+    }
 
     Ok(())
 }
@@ -158,7 +185,25 @@ where
     D: FnMut() -> (),
 {
     tm_bus_send(dio, clk, bus_delay, byte)?;
-    tm_bus_ack(dio, clk, bus_delay, err_code)
+    let verify_last = byte & COM_DATA_READ != COM_DATA_READ;
+    tm_bus_ack(dio, clk, bus_delay, err_code, verify_last)
+}
+
+#[inline]
+fn tm_bus_read_byte<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    bus_delay: &mut D,
+    err_code: u8,
+) -> Result<u8, TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: FnMut() -> (),
+{
+    let result = tm_bus_read(dio, clk, bus_delay);
+    tm_bus_ack(dio, clk, bus_delay, err_code, true)?;
+    result
 }
 
 ///
@@ -197,11 +242,42 @@ where
     }
 }
 
+///
+/// Reads key scan data as byte
+///
+#[inline]
+pub fn tm_read_byte<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    bus_delay: &mut D,
+) -> Result<u8, TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: FnMut() -> (),
+{
+    tm_bus_start(dio, clk, bus_delay)?;
+
+    tm_bus_send_byte(dio, clk, bus_delay, COM_DATA_READ, 230)?;
+
+    let read = tm_bus_read_byte(dio, clk, bus_delay, 240);
+
+    let stop = tm_bus_stop(dio, clk, bus_delay);
+    if stop.is_err() {
+        if read.is_err() {
+            return read;
+        } else {
+            return Err(stop.err().unwrap());
+        }
+    }
+    read
+}
+
 /// Resonable delay for TM serial protocol.
 ///
 /// Probably this value should fit all configurations, but you can adjust it.
 /// Delay value may vary depending on your circuit.
-/// For example adding additional pull up resitor to DIY LED module with TM1637 
+/// For example adding additional pull up resitor to DIY LED module with TM1637
 /// would allow to use smaller delay value.
 pub const BUS_DELAY_US: u16 = 500;
 
@@ -263,7 +339,6 @@ pub const CHAR_E: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_e: u8 = SEG_1 | SEG_2 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_F: u8 = SEG_1 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_G: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
-pub const CHAR_g: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
 pub const CHAR_H: u8 = SEG_2 | SEG_3 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_h: u8 = SEG_3 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_I: u8 = SEG_2 | SEG_3;
@@ -291,7 +366,13 @@ pub const CHAR_UNDERSCORE: u8 = SEG_4;
 pub const CHAR_BRACKET_LEFT: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
 
-pub const CHARS: [u8; 47] = [
+/// List of number characters. You can addres them by index: NUMBERS[5] stands for "5"
+pub const NUMBERS: [u8; 10] = [
+    CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
+];
+
+/// List of all available characters including numbers
+pub const CHARS: [u8; 46] = [
     CHAR_0,
     CHAR_1,
     CHAR_2,
@@ -312,7 +393,6 @@ pub const CHARS: [u8; 47] = [
     CHAR_e,
     CHAR_F,
     CHAR_G,
-    CHAR_g,
     CHAR_H,
     CHAR_h,
     CHAR_I,
