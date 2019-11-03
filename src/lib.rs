@@ -4,6 +4,7 @@
 //!
 //!
 #![no_std]
+#![allow(non_upper_case_globals)]
 use embedded_hal as hal;
 
 use hal::digital::v2::{InputPin, OutputPin};
@@ -399,20 +400,21 @@ pub const CHAR_t: u8 = SEG_4 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_U: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_u: u8 = SEG_3 | SEG_4 | SEG_5;
 pub const CHAR_y: u8 = SEG_2 | SEG_3 | SEG_4 | SEG_6 | SEG_7;
-pub const CHAR_E_MIRROR: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_CYR_E: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_7;
+pub const CHAR_CYR_B: u8 = SEG_1 | SEG_3 | SEG_4 | SEG_5 | SEG_6 | SEG_7;
 pub const CHAR_DEGREE: u8 = SEG_1 | SEG_2 | SEG_6 | SEG_7;
 pub const CHAR_MINUS: u8 = SEG_7;
 pub const CHAR_UNDERSCORE: u8 = SEG_4;
 pub const CHAR_BRACKET_LEFT: u8 = SEG_1 | SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
 
-/// List of numeral characters, just use array index 0-9 to get proper numeral.
-pub const NUMERALS: [u8; 10] = [
+/// List of digit characters where values correlates with array index 0-9.
+pub const DIGITS: [u8; 10] = [
     CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
 ];
 
 /// List of all available characters including numbers
-pub const CHARS: [u8; 46] = [
+pub const CHARS: [u8; 47] = [
     CHAR_0,
     CHAR_1,
     CHAR_2,
@@ -453,10 +455,54 @@ pub const CHARS: [u8; 46] = [
     CHAR_U,
     CHAR_u,
     CHAR_y,
-    CHAR_E_MIRROR,
+    CHAR_CYR_E,
+    CHAR_CYR_B,
     CHAR_DEGREE,
     CHAR_MINUS,
     CHAR_UNDERSCORE,
     CHAR_BRACKET_LEFT,
     CHAR_BRACKET_RIGHT,
 ];
+
+extern crate alloc;
+use alloc::vec::Vec;
+
+pub fn int_to_bytes(value: i32) -> Vec<u8> {
+    let mut chars = Vec::<u8>::with_capacity(11);
+    let mut v = if value < 0 { value * -1 } else { value };
+    while v > 0 {
+        chars.push(DIGITS[(v % 10) as usize]);
+        v /= 10;
+    }
+    if value < 0 {
+        chars.push(CHAR_MINUS);
+    }
+    if chars.is_empty() {
+        chars.push(DIGITS[0]);
+    }
+    chars.reverse();
+    chars
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn int_to_bytes_output() {
+        assert_eq!(int_to_bytes(0).as_slice(), &[DIGITS[0]]);
+
+        assert_eq!(
+            int_to_bytes(1234567890).as_slice(),
+            &[
+                DIGITS[1], DIGITS[2], DIGITS[3], DIGITS[4], DIGITS[5], DIGITS[6], DIGITS[7],
+                DIGITS[8], DIGITS[9], DIGITS[0]
+            ]
+        );
+
+        assert_eq!(
+            int_to_bytes(-1234).as_slice(),
+            &[CHAR_MINUS, DIGITS[1], DIGITS[2], DIGITS[3], DIGITS[4]]
+        );
+    }
+}
