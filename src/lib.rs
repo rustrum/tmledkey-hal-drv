@@ -5,8 +5,10 @@
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
-use embedded_hal as hal;
+extern crate alloc;
+use alloc::vec::Vec;
 
+use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 //use hal::blocking::delay::DelayUs;
 
@@ -193,7 +195,7 @@ where
 }
 
 #[inline]
-fn tm_bus_read_byte<DIO, CLK, D>(
+fn tm_bus_read_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -263,7 +265,7 @@ where
 
     tm_bus_send_byte_ack(dio, clk, bus_delay, COM_DATA_READ, 230)?;
 
-    let read = tm_bus_read_byte(dio, clk, bus_delay, 240);
+    let read = tm_bus_read_byte_ack(dio, clk, bus_delay, 240);
 
     let stop = tm_bus_stop(dio, clk, bus_delay);
     if stop.is_err() {
@@ -324,14 +326,49 @@ pub fn tm_read_bytes_3wire<'a, DIO, CLK, STB, D>(
     delay_us: &mut D,
     bus_delay_us: u16,
     length: u8,
-) -> Result<&'a [u8], TmError>
+) -> Result<Vec<u8>, TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
-    Ok(&[0])
+    stb.set_low().map_err(|_| TmError::Stb)?;
+
+    delay_us(bus_delay_us);
+
+    let mut delayer = || delay_us(bus_delay_us);
+    
+    let mut read_err = None;
+
+    let res_init = tm_bus_send(dio, clk, &mut delayer, COM_DATA_READ);
+    let mut response = Vec::<u8>::with_capacity(length as usize);
+
+    if res_init.is_err() {
+        read_err = Some(res_init.unwrap_err());
+    } else {
+        // Notice: When read data, set instruction from the 8th rising edge of clock
+        // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
+        delayer();
+        for i in 0..length {
+            match tm_bus_read(dio, clk, &mut delayer) {
+                Ok(b) => {
+                    response.push(b);
+                },
+                Err(e) => {
+                    read_err = Some(e);
+                    break;
+                }
+            }
+            //delayer();
+        }
+    }
+
+    if read_err.is_some() {
+        return Err(read_err.unwrap())
+    }
+
+    Ok(response)
 }
 
 /// Number of bytes that can be read from from TM1638 response.
