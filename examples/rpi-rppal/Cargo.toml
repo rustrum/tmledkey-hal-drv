@@ -11,6 +11,6 @@ clap = "2.33.0"
 void = "1.0.2"
 spin_sleep = "0.3.7"
 rppal = { version = "0.11.3"}
-embedded-hal = { version="0.2.3", features = ["unproven"]}
 # rppal = { version = "0.11.3", features = ["hal", "hal-unproven"] }
-tmledkey-hal-drv = { version="0.0.1", path  = "../../", features = [] }
+embedded-hal = { version="0.2.3", features = ["unproven"]}
+tmledkey-hal-drv = { version="0.1.0", path  = "../../", features = [] }

@@ -10,14 +10,18 @@ use embedded_hal as hal;
 use hal::digital::v2::{InputPin, OutputPin};
 //use hal::blocking::delay::DelayUs;
 
+pub mod utils;
+
 #[derive(Debug)]
 pub enum TmError {
     Dio,
     /// ACK error with tricky code.
-    /// Code could help to get more detaled information about where exactly error occured.
+    /// Code could help to get more detaled information about exact place where error occured.
     Ack(u8),
     Clk,
-    Empty,
+    Stb,
+    /// There was some errors in user input
+    Input,
 }
 
 #[inline]
@@ -171,7 +175,7 @@ where
 }
 
 #[inline]
-fn tm_bus_send_byte<DIO, CLK, D>(
+fn tm_bus_send_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -206,11 +210,11 @@ where
 }
 
 ///
-/// Send one or several bytes to MCU.
+/// Send one or several bytes to MCU via 2 wire interface (DIO,CLK).
 /// Accoding to datasheet it can be single commad byte or a sequence starting with command byte followed by several data bytes.
 ///
 #[inline]
-pub fn tm_send_bytes<DIO, CLK, D>(
+pub fn tm_send_bytes_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -223,10 +227,10 @@ where
 {
     tm_bus_start(dio, clk, bus_delay)?;
 
-    let mut send = Err(TmError::Empty);
+    let mut send = Err(TmError::Input);
     let mut iter = 10;
     for bt in bytes {
-        send = tm_bus_send_byte(dio, clk, bus_delay, bt.clone(), iter);
+        send = tm_bus_send_byte_ack(dio, clk, bus_delay, bt.clone(), iter);
         if send.is_err() {
             break;
         }
@@ -242,10 +246,10 @@ where
 }
 
 ///
-/// Reads key scan data as byte
+/// Reads key scan data as byte via 2 wire interface (DIO,CLK).
 ///
 #[inline]
-pub fn tm_read_byte<DIO, CLK, D>(
+pub fn tm_read_byte_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     bus_delay: &mut D,
@@ -257,7 +261,7 @@ where
 {
     tm_bus_start(dio, clk, bus_delay)?;
 
-    tm_bus_send_byte(dio, clk, bus_delay, COM_DATA_READ, 230)?;
+    tm_bus_send_byte_ack(dio, clk, bus_delay, COM_DATA_READ, 230)?;
 
     let read = tm_bus_read_byte(dio, clk, bus_delay, 240);
 
@@ -273,10 +277,10 @@ where
 }
 
 ///
-/// Send bytes using 3 wire interface DIO,CLK,STB.
+/// Send bytes using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
-pub fn tm_send_bytes_stb<DIO, CLK, STB, D>(
+pub fn tm_send_bytes_3wire<DIO, CLK, STB, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     stb: &mut STB,
@@ -290,14 +294,30 @@ where
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
-    Ok(())
+    stb.set_low().map_err(|_| TmError::Stb)?;
+    delay_us(bus_delay_us);
+
+    let mut send = Err(TmError::Input);
+    let mut delayer = || delay_us(bus_delay_us);
+    for bt in bytes {
+        send = tm_bus_send(dio, clk, &mut delayer, bt.clone());
+        if send.is_err() {
+            break;
+        }
+        // Notice: When read data, set instruction from the 8th rising edge of clock
+        // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
+        delayer();
+    }
+    delay_us(bus_delay_us);
+    stb.set_high().map_err(|_| TmError::Stb)?;
+    send
 }
 
 ///
-/// Read *length* of bytes from MCU using 3 wire interface DIO,CLK,STB.
+/// Read *length* of bytes from MCU using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
-pub fn tm_read_bytes_stb<'a, DIO, CLK, STB, D>(
+pub fn tm_read_bytes_3wire<'a, DIO, CLK, STB, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     stb: &mut STB,
@@ -314,12 +334,20 @@ where
     Ok(&[0])
 }
 
+/// Number of bytes that can be read from from TM1638 response.
+pub const TM1638_RESPONSE_SIZE: u8 = 4;
+/// Maximum number of display segments supported by this MCU.
+pub const TM1638_MAX_SEGMENTS: u8 = 10;
+
+/// Number of bytes that can be read from from TM1637 response.
+pub const TM1637_RESPONSE_SIZE: u8 = 1;
+/// Maximum number of display segments supported by this MCU.
+pub const TM1637_MAX_SEGMENTS: u8 = 6;
+
 /// Resonable delay for TM serial protocol.
 ///
-/// Probably this value should fit all configurations, but you can adjust it.
-/// Delay value may vary depending on your circuit.
-/// For example adding additional pull up resitor to DIY LED module with TM1637
-/// would allow to use smaller delay value.
+/// This value should fit all configurations, but you can adjust it.
+/// Delay value may vary depending on your circuit (consider pull up resitors).
 pub const BUS_DELAY_US: u16 = 500;
 
 /// Lower but sill working delay accroding to my own tests.
@@ -463,46 +491,3 @@ pub const CHARS: [u8; 47] = [
     CHAR_BRACKET_LEFT,
     CHAR_BRACKET_RIGHT,
 ];
-
-extern crate alloc;
-use alloc::vec::Vec;
-
-pub fn int_to_bytes(value: i32) -> Vec<u8> {
-    let mut chars = Vec::<u8>::with_capacity(11);
-    let mut v = if value < 0 { value * -1 } else { value };
-    while v > 0 {
-        chars.push(DIGITS[(v % 10) as usize]);
-        v /= 10;
-    }
-    if value < 0 {
-        chars.push(CHAR_MINUS);
-    }
-    if chars.is_empty() {
-        chars.push(DIGITS[0]);
-    }
-    chars.reverse();
-    chars
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn int_to_bytes_output() {
-        assert_eq!(int_to_bytes(0).as_slice(), &[DIGITS[0]]);
-
-        assert_eq!(
-            int_to_bytes(1234567890).as_slice(),
-            &[
-                DIGITS[1], DIGITS[2], DIGITS[3], DIGITS[4], DIGITS[5], DIGITS[6], DIGITS[7],
-                DIGITS[8], DIGITS[9], DIGITS[0]
-            ]
-        );
-
-        assert_eq!(
-            int_to_bytes(-1234).as_slice(),
-            &[CHAR_MINUS, DIGITS[1], DIGITS[2], DIGITS[3], DIGITS[4]]
-        );
-    }
-}
