@@ -306,7 +306,7 @@ where
         }
         // Notice: When read data, set instruction from the 8th rising edge of clock
         // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
-        delayer();
+        //delayer();
     }
     delay_us(bus_delay_us);
     stb.set_high().map_err(|_| TmError::Stb)?;

@@ -245,6 +245,7 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
 }
 
 fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
+    let DELAY: u16 = 500;
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
     let clk = gpio
@@ -273,7 +274,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
         &mut tm_clk,
         &mut tm_stb,
         &mut bus_delay,
-        tm::BUS_DELAY_US_FAST,
+        DELAY,
         &[tm::COM_DATA_ADDRESS_ADD],
     );
     println!("Display initialized: {:?}", r);
@@ -283,7 +284,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
         &mut tm_clk,
         &mut tm_stb,
         &mut bus_delay,
-        tm::BUS_DELAY_US_FAST,
+        DELAY,
         &[tm::COM_DISPLAY_ON],
     );
     println!("Brightness Init {:?}", r);
@@ -303,7 +304,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            tm::BUS_DELAY_US_FAST,
+            DELAY,
             &[tm::COM_DISPLAY_ON | b],
         );
 
@@ -312,7 +313,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            tm::BUS_DELAY_US_FAST,
+            DELAY,
             &bts,
         );
 
@@ -321,7 +322,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            tm::BUS_DELAY_US_FAST,
+            DELAY,
             tm::TM1638_RESPONSE_SIZE,
         );
 
