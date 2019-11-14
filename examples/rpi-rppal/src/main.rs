@@ -245,7 +245,7 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
 }
 
 fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
-    let DELAY: u16 = 500;
+    let DELAY: u16 = 1;
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
     let clk = gpio
@@ -289,13 +289,13 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
     );
     println!("Brightness Init {:?}", r);
 
-    let mut nums: [u8; 5] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4];
+    let mut nums: [u8; 9] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4, 5, 6, 7, 8];
     let mut iter = 0;
     loop {
-        let mut bts: [u8; 5] = [0; 5];
+        let mut bts: [u8; 17] = [0; 17];
         bts[0] = nums[0];
         for i in 1..nums.len() {
-            bts[i] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
+            bts[(i - 1) * 2 + 1] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
         }
 
         let b = iter % 8;
@@ -327,11 +327,18 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
         );
 
         match read {
-            Ok(byte) => println!("Byte readed: {:04b}_{:04b}", byte[0] >> 4, byte[0] & 0xF),
+            Ok(bytes) => println!(
+                "Bytes read: {}",
+                bytes
+                    .into_iter()
+                    .map(|b| format!("{:04b}_{:04b}", b >> 4, b & 0xF))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             Err(e) => println!("Read error {:?}", e),
         };
 
-        delay.delay_ms(250_u16);
+        delay.delay_ms(400_u16);
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;
         }

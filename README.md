@@ -5,10 +5,10 @@
 Titan Micro is a Chinese manufacturer that produce several type of controllers for [7 segment LED displays](https://en.wikipedia.org/wiki/Seven-SEG_display) with additional keyboard key scan functionality.
 
 At least next controller variants are exist on the market:
- * TM1636 - 2 wire interface, 16 keys 
+ * TM1636 - 2 wire interface, 4 displays, 16 keys 
  * TM1637 (popular) - 2 wire interface, 6 displays, 16 keys
- * TM1638 (popular) - 3 wire interface, 8 displays, 24 keys
- * TM1639 - 3 wire interface, 8 displays, 8 keys 
+ * TM1638 (popular) - 3 wire interface, 8 displays (10 segments), 24 keys
+ * TM1639 - 3 wire interface, 8 displays (12 segments ?), 8 keys
  * TM1640 - 2 wire interface, 16 displays, no keys
 
 This driver implements low level functions to send/read data with 2 or 3 wire interface.

@@ -312,6 +312,7 @@ where
     }
     delay_us(bus_delay_us);
     stb.set_high().map_err(|_| TmError::Stb)?;
+    delay_us(bus_delay_us);
     send
 }
 
@@ -338,7 +339,6 @@ where
     delay_us(bus_delay_us);
 
     let mut delayer = || delay_us(bus_delay_us);
-    
     let mut read_err = None;
 
     let res_init = tm_bus_send(dio, clk, &mut delayer, COM_DATA_READ);
@@ -354,7 +354,7 @@ where
             match tm_bus_read(dio, clk, &mut delayer) {
                 Ok(b) => {
                     response.push(b);
-                },
+                }
                 Err(e) => {
                     read_err = Some(e);
                     break;
@@ -363,9 +363,10 @@ where
             //delayer();
         }
     }
-
+    stb.set_high().map_err(|_| TmError::Stb)?;
+    delay_us(bus_delay_us);
     if read_err.is_some() {
-        return Err(read_err.unwrap())
+        return Err(read_err.unwrap());
     }
 
     Ok(response)
@@ -389,6 +390,9 @@ pub const BUS_DELAY_US: u16 = 500;
 
 /// Lower but sill working delay accroding to my own tests.
 pub const BUS_DELAY_US_FAST: u16 = 350;
+
+/// Prooven working delay for TM1638
+pub const TM1638_BUS_DELAY_US: u16 = 1;
 
 /// Address adding mode (write to display)
 pub const COM_DATA_ADDRESS_ADD: u8 = 0b01000000;
@@ -424,6 +428,15 @@ pub const SEG_6: u8 = 0b100000;
 pub const SEG_7: u8 = 0b1000000;
 /// Segment DP (eight) - dot or colon
 pub const SEG_8: u8 = 0b10000000;
+
+/// Used with second byte in pair for 3 wire interface
+pub const SEG_9: u8 = SEG_1;
+/// Used with second byte in pair for 3 wire interface
+pub const SEG_10: u8 = SEG_2;
+/// Used with second byte in pair for 3 wire interface
+pub const SEG_11: u8 = SEG_3;
+/// Used with second byte in pair for 3 wire interface
+pub const SEG_12: u8 = SEG_4;
 
 pub const CHAR_0: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;
 pub const CHAR_1: u8 = SEG_2 | SEG_3;
