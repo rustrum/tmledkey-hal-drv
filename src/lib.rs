@@ -296,6 +296,7 @@ where
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
+    delay_us(bus_delay_us);
     stb.set_low().map_err(|_| TmError::Stb)?;
     delay_us(bus_delay_us);
 
@@ -312,12 +313,13 @@ where
     }
     delay_us(bus_delay_us);
     stb.set_high().map_err(|_| TmError::Stb)?;
-    delay_us(bus_delay_us);
+    clk.set_high().map_err(|_| TmError::Stb)?;
+    dio.set_high().map_err(|_| TmError::Stb)?;
     send
 }
 
 ///
-/// Read *length* of bytes from MCU using 3 wire interface (DIO,CLK,STB).
+/// Read **length** of bytes from MCU using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
 pub fn tm_read_bytes_3wire<'a, DIO, CLK, STB, D>(
@@ -334,23 +336,23 @@ where
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
-    stb.set_low().map_err(|_| TmError::Stb)?;
-
-    delay_us(bus_delay_us);
-
     let mut delayer = || delay_us(bus_delay_us);
     let mut read_err = None;
-
-    let res_init = tm_bus_send(dio, clk, &mut delayer, COM_DATA_READ);
     let mut response = Vec::<u8>::with_capacity(length as usize);
 
+    delayer();
+    stb.set_low().map_err(|_| TmError::Stb)?;
+    delayer();
+
+    let res_init = tm_bus_send(dio, clk, &mut delayer, COM_DATA_READ);
+    dio.set_high().map_err(|_| TmError::Stb)?;
     if res_init.is_err() {
         read_err = Some(res_init.unwrap_err());
     } else {
         // Notice: When read data, set instruction from the 8th rising edge of clock
         // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
         delayer();
-        for i in 0..length {
+        for _ in 0..length {
             match tm_bus_read(dio, clk, &mut delayer) {
                 Ok(b) => {
                     response.push(b);
@@ -363,12 +365,14 @@ where
             //delayer();
         }
     }
+
     stb.set_high().map_err(|_| TmError::Stb)?;
-    delay_us(bus_delay_us);
+    clk.set_high().map_err(|_| TmError::Stb)?;
+    dio.set_high().map_err(|_| TmError::Stb)?;
+
     if read_err.is_some() {
         return Err(read_err.unwrap());
     }
-
     Ok(response)
 }
 
@@ -394,15 +398,21 @@ pub const BUS_DELAY_US_FAST: u16 = 350;
 /// Prooven working delay for TM1638
 pub const TM1638_BUS_DELAY_US: u16 = 1;
 
-/// Address adding mode (write to display)
-pub const COM_DATA_ADDRESS_ADD: u8 = 0b01000000;
-/// Data fix address mode (write to display)
-pub const COM_DATA_ADDRESS_FIXED: u8 = 0b01000100;
-/// Read key scan data
-pub const COM_DATA_READ: u8 = 0b01000010;
+/// Data control instruction set
+pub const COM_DATA: u8 = 0b01000000;
 
-/// Register address command mask
+/// Display control instruction set
+pub const COM_DISPLAY: u8 = 0b10000000;
+
+/// Address instruction set
 pub const COM_ADDRESS: u8 = 0b11000000;
+
+/// Address adding mode (write to display)
+pub const COM_DATA_ADDRESS_ADD: u8 = COM_DATA | 0b000000;
+/// Data fix address mode (write to display)
+pub const COM_DATA_ADDRESS_FIXED: u8 = COM_DATA | 0b000100;
+/// Read key scan data
+pub const COM_DATA_READ: u8 = COM_DATA | 0b000010;
 
 /// Display ON max brightness.
 /// Can be combined with masked bytes to adjust brightness level
