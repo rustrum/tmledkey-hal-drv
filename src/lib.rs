@@ -29,19 +29,20 @@ pub enum TmError {
 #[inline]
 fn tm_bus_dio_wait_ack<DIO, D>(
     dio: &mut DIO,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     expect_high: bool,
     err: u8,
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     for _ in 0..5 {
         if expect_high == dio.is_high().map_err(|_| TmError::Dio)? {
             return Ok(());
         }
-        bus_delay();
+        delay_us(bus_delay_us);
     }
 
     Err(TmError::Ack(err))
@@ -49,33 +50,43 @@ where
 
 /// Expecting to have initial state on bus CLK is UP and DIO is UP.
 #[inline]
-fn tm_bus_start<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<(), TmError>
+fn tm_bus_start<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     dio.set_low().map_err(|_| TmError::Dio)?;
-    bus_delay();
+    delay_us(bus_delay_us);
     Ok(())
 }
 
 #[inline]
-fn tm_bus_stop<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<(), TmError>
+fn tm_bus_stop<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     dio.set_low().map_err(|_| TmError::Dio)?;
-    bus_delay();
+    delay_us(bus_delay_us);
 
     clk.set_high().map_err(|_| TmError::Clk)?;
-    bus_delay();
+    delay_us(bus_delay_us);
 
     dio.set_high().map_err(|_| TmError::Dio)?;
-    tm_bus_dio_wait_ack(dio, bus_delay, true, 255)?;
-    bus_delay();
+    tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, true, 255)?;
+    delay_us(bus_delay_us);
     Ok(())
 }
 
@@ -84,18 +95,19 @@ where
 fn tm_bus_send<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     mut byte: u8,
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     for _ in 0..8 {
         clk.set_low().map_err(|_| TmError::Clk)?;
         // This delay can be skipped, but data transfer become unstable
-        bus_delay();
+        delay_us(bus_delay_us);
 
         let high = byte & 0b1 != 0;
         byte = byte >> 1;
@@ -104,32 +116,37 @@ where
         } else {
             dio.set_low().map_err(|_| TmError::Dio)?;
         }
-        bus_delay();
+        delay_us(bus_delay_us);
 
         clk.set_high().map_err(|_| TmError::Clk)?;
-        bus_delay();
+        delay_us(bus_delay_us);
     }
     Ok(())
 }
 
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
-fn tm_bus_read<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, bus_delay: &mut D) -> Result<u8, TmError>
+fn tm_bus_read<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+) -> Result<u8, TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     let mut byte = 0;
     for i in 0..8 {
         clk.set_low().map_err(|_| TmError::Clk)?;
-        bus_delay();
+        delay_us(bus_delay_us);
         // Looks like MCU changes dio at low CLK
         clk.set_high().map_err(|_| TmError::Clk)?;
         if dio.is_high().map_err(|_| TmError::Dio)? {
             byte = byte | 0x80 >> i;
         }
-        bus_delay();
+        delay_us(bus_delay_us);
     }
     Ok(byte)
 }
@@ -139,38 +156,39 @@ where
 fn tm_bus_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     err_code: u8,
     verify_last: bool,
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
     // 8th cycle falling edge
     dio.set_high().map_err(|_| TmError::Dio)?;
     clk.set_low().map_err(|_| TmError::Clk)?;
-    bus_delay();
+    delay_us(bus_delay_us);
 
     // Ensure that DIO was pulled down at 8th cycle falling edge
-    tm_bus_dio_wait_ack(dio, bus_delay, false, err_code + 1)?;
+    tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, false, err_code + 1)?;
 
     // 9th cycle rising edge
     clk.set_high().map_err(|_| TmError::Clk)?;
-    bus_delay();
+    delay_us(bus_delay_us);
 
     // Ensure DIO still low at 9th cycle rising edge
-    tm_bus_dio_wait_ack(dio, bus_delay, false, err_code + 2)?;
+    tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, false, err_code + 2)?;
 
     // 9th cycle falling edge
     clk.set_low().map_err(|_| TmError::Clk)?;
-    bus_delay();
+    delay_us(bus_delay_us);
 
     // Ensure DIO was released and now it is up
     if verify_last {
         // No need to check last ack for reading mode
-        tm_bus_dio_wait_ack(dio, bus_delay, true, err_code + 3)?;
+        tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, true, err_code + 3)?;
     }
 
     Ok(())
@@ -180,34 +198,36 @@ where
 fn tm_bus_send_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     byte: u8,
     err_code: u8,
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
-    tm_bus_send(dio, clk, bus_delay, byte)?;
+    tm_bus_send(dio, clk, delay_us, bus_delay_us, byte)?;
     let verify_last = byte & COM_DATA_READ != COM_DATA_READ;
-    tm_bus_ack(dio, clk, bus_delay, err_code, verify_last)
+    tm_bus_ack(dio, clk, delay_us, bus_delay_us, err_code, verify_last)
 }
 
 #[inline]
 fn tm_bus_read_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     err_code: u8,
 ) -> Result<u8, TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
-    let result = tm_bus_read(dio, clk, bus_delay);
-    tm_bus_ack(dio, clk, bus_delay, err_code, true)?;
+    let result = tm_bus_read(dio, clk, delay_us, bus_delay_us);
+    tm_bus_ack(dio, clk, delay_us, bus_delay_us, err_code, true)?;
     result
 }
 
@@ -219,27 +239,28 @@ where
 pub fn tm_send_bytes_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
     bytes: &[u8],
 ) -> Result<(), TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
-    tm_bus_start(dio, clk, bus_delay)?;
+    tm_bus_start(dio, clk, delay_us, bus_delay_us)?;
 
     let mut send = Err(TmError::Input);
     let mut iter = 10;
     for bt in bytes {
-        send = tm_bus_send_byte_ack(dio, clk, bus_delay, bt.clone(), iter);
+        send = tm_bus_send_byte_ack(dio, clk, delay_us, bus_delay_us, bt.clone(), iter);
         if send.is_err() {
             break;
         }
         iter += 10;
     }
 
-    let stop = tm_bus_stop(dio, clk, bus_delay);
+    let stop = tm_bus_stop(dio, clk, delay_us, bus_delay_us);
     if send.is_err() {
         send
     } else {
@@ -254,20 +275,21 @@ where
 pub fn tm_read_byte_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
-    bus_delay: &mut D,
+    delay_us: &mut D,
+    bus_delay_us: u16,
 ) -> Result<u8, TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
-    D: FnMut() -> (),
+    D: FnMut(u16) -> (),
 {
-    tm_bus_start(dio, clk, bus_delay)?;
+    tm_bus_start(dio, clk, delay_us, bus_delay_us)?;
 
-    tm_bus_send_byte_ack(dio, clk, bus_delay, COM_DATA_READ, 230)?;
+    tm_bus_send_byte_ack(dio, clk, delay_us, bus_delay_us, COM_DATA_READ, 230)?;
 
-    let read = tm_bus_read_byte_ack(dio, clk, bus_delay, 240);
+    let read = tm_bus_read_byte_ack(dio, clk, delay_us, bus_delay_us, 240);
 
-    let stop = tm_bus_stop(dio, clk, bus_delay);
+    let stop = tm_bus_stop(dio, clk, delay_us, bus_delay_us);
     if stop.is_err() {
         if read.is_err() {
             return read;
@@ -301,9 +323,8 @@ where
     delay_us(bus_delay_us);
 
     let mut send = Err(TmError::Input);
-    let mut delayer = || delay_us(bus_delay_us);
     for bt in bytes {
-        send = tm_bus_send(dio, clk, &mut delayer, bt.clone());
+        send = tm_bus_send(dio, clk, delay_us, bus_delay_us, bt.clone());
         if send.is_err() {
             break;
         }
@@ -336,24 +357,23 @@ where
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
-    let mut delayer = || delay_us(bus_delay_us);
     let mut read_err = None;
     let mut response = Vec::<u8>::with_capacity(length as usize);
 
-    delayer();
+    delay_us(bus_delay_us);
     stb.set_low().map_err(|_| TmError::Stb)?;
-    delayer();
+    delay_us(bus_delay_us);
 
-    let res_init = tm_bus_send(dio, clk, &mut delayer, COM_DATA_READ);
+    let res_init = tm_bus_send(dio, clk, delay_us, bus_delay_us, COM_DATA_READ);
     dio.set_high().map_err(|_| TmError::Stb)?;
     if res_init.is_err() {
         read_err = Some(res_init.unwrap_err());
     } else {
         // Notice: When read data, set instruction from the 8th rising edge of clock
         // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
-        delayer();
+        delay_us(bus_delay_us);
         for _ in 0..length {
-            match tm_bus_read(dio, clk, &mut delayer) {
+            match tm_bus_read(dio, clk, delay_us, bus_delay_us) {
                 Ok(b) => {
                     response.push(b);
                 }
@@ -362,7 +382,6 @@ where
                     break;
                 }
             }
-            //delayer();
         }
     }
 
@@ -390,10 +409,10 @@ pub const TM1637_MAX_SEGMENTS: u8 = 6;
 ///
 /// This value should fit all configurations, but you can adjust it.
 /// Delay value may vary depending on your circuit (consider pull up resitors).
-pub const BUS_DELAY_US: u16 = 500;
+pub const BUS_DELAY_US: u16 = 400;
 
-/// Lower but sill working delay accroding to my own tests.
-pub const BUS_DELAY_US_FAST: u16 = 350;
+/// Prooven working delay for TM1637
+pub const TM1637_BUS_DELAY_US: u16 = 350;
 
 /// Prooven working delay for TM1638
 pub const TM1638_BUS_DELAY_US: u16 = 1;
@@ -439,13 +458,13 @@ pub const SEG_7: u8 = 0b1000000;
 /// Segment DP (eight) - dot or colon
 pub const SEG_8: u8 = 0b10000000;
 
-/// Used with second byte in pair for 3 wire interface
+/// Used with 3 wire interface for second byte
 pub const SEG_9: u8 = SEG_1;
-/// Used with second byte in pair for 3 wire interface
+/// Used with 3 wire interface for second byte
 pub const SEG_10: u8 = SEG_2;
-/// Used with second byte in pair for 3 wire interface
+/// Used with 3 wire interface for second byte
 pub const SEG_11: u8 = SEG_3;
-/// Used with second byte in pair for 3 wire interface
+/// Used with 3 wire interface for second byte
 pub const SEG_12: u8 = SEG_4;
 
 pub const CHAR_0: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4 | SEG_5 | SEG_6;

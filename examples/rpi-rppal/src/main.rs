@@ -8,7 +8,7 @@ use embedded_hal::{
 };
 use rppal::gpio::{Gpio, IoPin, Mode};
 use spin_sleep;
-use std::{thread, time};
+use std::time;
 use void;
 
 use tmledkey_hal_drv as tm;
@@ -168,6 +168,11 @@ fn main() {
     }
 }
 
+#[inline]
+fn delay_us(us: u16) {
+    spin_sleep::sleep(time::Duration::from_micros(us as u64));
+}
+
 fn demo_2_wire(dio_num: u8, clk_num: u8) {
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
@@ -184,13 +189,12 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
     let mut tm_dio = OpenPin::new(dio);
     let mut tm_clk = OutPin { pin: clk };
     let mut delay = Delayer {};
-    let mut bus_delay =
-        || spin_sleep::sleep(time::Duration::from_micros(tm::BUS_DELAY_US_FAST as u64));
 
     let r = tm::tm_send_bytes_2wire(
         &mut tm_dio,
         &mut tm_clk,
-        &mut bus_delay,
+        &mut delay_us,
+        tm::TM1637_BUS_DELAY_US,
         &[tm::COM_DATA_ADDRESS_ADD],
     );
     println!("Display initialized: {:?}", r);
@@ -198,7 +202,8 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
     let r = tm::tm_send_bytes_2wire(
         &mut tm_dio,
         &mut tm_clk,
-        &mut bus_delay,
+        &mut delay_us,
+        tm::TM1637_BUS_DELAY_US,
         &[tm::COM_DISPLAY_ON],
     );
     println!("Brightness Init {:?}", r);
@@ -216,20 +221,25 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
         let r = tm::tm_send_bytes_2wire(
             &mut tm_dio,
             &mut tm_clk,
-            &mut || delay.delay_us(tm::BUS_DELAY_US),
+            &mut delay_us,
+            tm::TM1637_BUS_DELAY_US,
             &[tm::COM_DISPLAY_ON | b],
         );
 
         let pr = tm::tm_send_bytes_2wire(
             &mut tm_dio,
             &mut tm_clk,
-            &mut || delay.delay_us(tm::BUS_DELAY_US),
+            &mut delay_us,
+            tm::TM1637_BUS_DELAY_US,
             &bts,
         );
 
-        let read = tm::tm_read_byte_2wire(&mut tm_dio, &mut tm_clk, &mut || {
-            delay.delay_us(tm::BUS_DELAY_US)
-        });
+        let read = tm::tm_read_byte_2wire(
+            &mut tm_dio,
+            &mut tm_clk,
+            &mut delay_us,
+            tm::TM1637_BUS_DELAY_US,
+        );
 
         match read {
             Ok(byte) => println!("Byte readed: {:04b}_{:04b}", byte >> 4, byte & 0xF),
@@ -245,7 +255,6 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
 }
 
 fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
-    let DELAY: u16 = 1;
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
     let clk = gpio
@@ -274,7 +283,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
         &mut tm_clk,
         &mut tm_stb,
         &mut bus_delay,
-        DELAY,
+        tm::TM1638_BUS_DELAY_US,
         &[tm::COM_DATA_ADDRESS_ADD],
     );
     println!("Display initialized: {:?}", r);
@@ -284,13 +293,14 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
         &mut tm_clk,
         &mut tm_stb,
         &mut bus_delay,
-        DELAY,
+        tm::TM1638_BUS_DELAY_US,
         &[tm::COM_DISPLAY_ON],
     );
     println!("Brightness Init {:?}", r);
 
     let mut nums: [u8; 9] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4, 5, 6, 7, 8];
     let mut iter = 0;
+    let mut key_scan: Vec<u8> = Vec::new();
     loop {
         let mut bts: [u8; 17] = [0; 17];
         bts[0] = nums[0];
@@ -304,7 +314,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            DELAY,
+            tm::TM1638_BUS_DELAY_US,
             &[tm::COM_DISPLAY_ON | b],
         );
 
@@ -313,7 +323,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            DELAY,
+            tm::TM1638_BUS_DELAY_US,
             &bts,
         );
 
@@ -322,19 +332,26 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             &mut tm_clk,
             &mut tm_stb,
             &mut bus_delay,
-            DELAY,
+            tm::TM1638_BUS_DELAY_US,
             tm::TM1638_RESPONSE_SIZE,
         );
 
         match read {
-            Ok(bytes) => println!(
-                "Bytes read: {}",
-                bytes
-                    .into_iter()
-                    .map(|b| format!("{:04b}_{:04b}", b >> 4, b & 0xF))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            Ok(bytes) => {
+                if bytes != key_scan {
+                    key_scan = bytes;
+
+                    println!(
+                        "Bytes read: {}",
+                        key_scan
+                            .clone()
+                            .into_iter()
+                            .map(|b| format!("{:04b}_{:04b}", b >> 4, b & 0xF))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                }
+            }
             Err(e) => println!("Read error {:?}", e),
         };
 
