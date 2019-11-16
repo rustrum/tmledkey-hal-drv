@@ -13,3 +13,19 @@ keywords = ["tm1637", "led", "hal"]
 
 [dependencies]
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
+
+[features]
+# Enable key scan functionality (reading data)
+key-scan=[]
+
+# Enable 2 wire inteface CLK + DIO
+clkdio=[]
+
+# Enable 3 wire inteface CLK + DIO + STB
+clkdiostb=[]
+
+# Demo code that you probably would not need for your app
+demo=[]
+
+# Demo code that you probably would not need for your app
+fx=[]

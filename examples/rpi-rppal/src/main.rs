@@ -160,20 +160,15 @@ fn main() {
     match stb {
         Some(sstb) => {
             let stb_num = sstb.parse::<u8>().expect("Can not parse STB as int");
-            demo_3_wire(dio_num, clk_num, stb_num);
+            demo_3_wire_start(dio_num, clk_num, stb_num);
         }
         None => {
-            demo_2_wire(dio_num, clk_num);
+            demo_2_wire_start(dio_num, clk_num);
         }
     }
 }
 
-#[inline]
-fn delay_us(us: u16) {
-    spin_sleep::sleep(time::Duration::from_micros(us as u64));
-}
-
-fn demo_2_wire(dio_num: u8, clk_num: u8) {
+fn demo_2_wire_start(dio_num: u8, clk_num: u8) {
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
     let clk = gpio
@@ -190,19 +185,30 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
     let mut tm_clk = OutPin { pin: clk };
     let mut delay = Delayer {};
 
+    demo_2_wire_run(&mut tm_dio, &mut tm_clk, &mut delay);
+}
+
+fn demo_2_wire_run<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, delayer: &mut D)
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: DelayMs<u16> + DelayUs<u16>,
+{
+    let mut bus_delay = |us: u16| delayer.delay_us(us);
+
     let r = tm::tm_send_bytes_2wire(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut delay_us,
+        dio,
+        clk,
+        &mut bus_delay,
         tm::TM1637_BUS_DELAY_US,
         &[tm::COM_DATA_ADDRESS_ADD],
     );
     println!("Display initialized: {:?}", r);
 
     let r = tm::tm_send_bytes_2wire(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut delay_us,
+        dio,
+        clk,
+        &mut bus_delay,
         tm::TM1637_BUS_DELAY_US,
         &[tm::COM_DISPLAY_ON],
     );
@@ -219,34 +225,23 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
 
         let b = iter % 8;
         let r = tm::tm_send_bytes_2wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut delay_us,
+            dio,
+            clk,
+            &mut bus_delay,
             tm::TM1637_BUS_DELAY_US,
             &[tm::COM_DISPLAY_ON | b],
         );
 
-        let pr = tm::tm_send_bytes_2wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut delay_us,
-            tm::TM1637_BUS_DELAY_US,
-            &bts,
-        );
+        let pr = tm::tm_send_bytes_2wire(dio, clk, &mut bus_delay, tm::TM1637_BUS_DELAY_US, &bts);
 
-        let read = tm::tm_read_byte_2wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut delay_us,
-            tm::TM1637_BUS_DELAY_US,
-        );
+        let read = tm::tm_read_byte_2wire(dio, clk, &mut bus_delay, tm::TM1637_BUS_DELAY_US);
 
         match read {
             Ok(byte) => println!("Byte readed: {:04b}_{:04b}", byte >> 4, byte & 0xF),
             Err(e) => println!("Read error {:?}", e),
         };
 
-        delay.delay_ms(250_u16);
+        spin_sleep::sleep(time::Duration::from_millis(400));
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;
         }
@@ -254,7 +249,7 @@ fn demo_2_wire(dio_num: u8, clk_num: u8) {
     }
 }
 
-fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
+fn demo_3_wire_start(dio_num: u8, clk_num: u8, stb_num: u8) {
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
     let clk = gpio
@@ -275,13 +270,25 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
     let mut tm_dio = OpenPin::new(dio);
     let mut tm_clk = OutPin { pin: clk };
     let mut tm_stb = OutPin { pin: stb };
-    let mut delay = Delayer {};
-    let mut bus_delay = |us: u16| spin_sleep::sleep(time::Duration::from_micros(us as u64));
+
+    let mut delayer = Delayer {};
+
+    demo_3_wire_run(&mut tm_dio, &mut tm_clk, &mut tm_stb, &mut delayer);
+}
+
+fn demo_3_wire_run<DIO, CLK, STB, D>(dio: &mut DIO, clk: &mut CLK, stb: &mut STB, delayer: &mut D)
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    STB: OutputPin,
+    D: DelayMs<u16> + DelayUs<u16>,
+{
+    let mut bus_delay = |us: u16| delayer.delay_us(us);
 
     let r = tm::tm_send_bytes_3wire(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut tm_stb,
+        dio,
+        clk,
+        stb,
         &mut bus_delay,
         tm::TM1638_BUS_DELAY_US,
         &[tm::COM_DATA_ADDRESS_ADD],
@@ -289,14 +296,14 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
     println!("Display initialized: {:?}", r);
 
     let r = tm::tm_send_bytes_3wire(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut tm_stb,
+        dio,
+        clk,
+        stb,
         &mut bus_delay,
         tm::TM1638_BUS_DELAY_US,
         &[tm::COM_DISPLAY_ON],
     );
-    println!("Brightness Init {:?}", r);
+    println!("Brightness Inited {:?}", r);
 
     let mut nums: [u8; 9] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4, 5, 6, 7, 8];
     let mut iter = 0;
@@ -310,27 +317,21 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
 
         let b = iter % 8;
         let r = tm::tm_send_bytes_3wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut tm_stb,
+            dio,
+            clk,
+            stb,
             &mut bus_delay,
             tm::TM1638_BUS_DELAY_US,
             &[tm::COM_DISPLAY_ON | b],
         );
 
-        let pr = tm::tm_send_bytes_3wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut tm_stb,
-            &mut bus_delay,
-            tm::TM1638_BUS_DELAY_US,
-            &bts,
-        );
+        let pr =
+            tm::tm_send_bytes_3wire(dio, clk, stb, &mut bus_delay, tm::TM1638_BUS_DELAY_US, &bts);
 
         let read = tm::tm_read_bytes_3wire(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut tm_stb,
+            dio,
+            clk,
+            stb,
             &mut bus_delay,
             tm::TM1638_BUS_DELAY_US,
             tm::TM1638_RESPONSE_SIZE,
@@ -355,7 +356,7 @@ fn demo_3_wire(dio_num: u8, clk_num: u8, stb_num: u8) {
             Err(e) => println!("Read error {:?}", e),
         };
 
-        delay.delay_ms(400_u16);
+        spin_sleep::sleep(time::Duration::from_millis(400));
         for i in 1..nums.len() {
             nums[i] = nums[i] + 1;
         }

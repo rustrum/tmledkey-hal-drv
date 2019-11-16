@@ -1,12 +1,10 @@
-extern crate alloc;
-
 use alloc::vec::Vec;
 
 use super::{CHAR_MINUS, DIGITS};
 
 ///
 /// Convert given integer value to appropriate bytes vector.
-/// Require to have propery configured memory allocator in your project.
+/// Require to have properly configured memory allocator in your project.
 ///
 pub fn int_to_bytes(value: i32) -> Vec<u8> {
     let mut chars = Vec::<u8>::with_capacity(11);

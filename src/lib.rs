@@ -6,13 +6,20 @@
 #![no_std]
 #![allow(non_upper_case_globals)]
 extern crate alloc;
+#[cfg(feature = "key-scan")]
 use alloc::vec::Vec;
 
-use embedded_hal as hal;
-use hal::digital::v2::{InputPin, OutputPin};
-//use hal::blocking::delay::DelayUs;
-
+#[cfg(feature = "default")]
 pub mod utils;
+
+#[cfg(feature = "fx")]
+pub mod fx;
+
+#[cfg(feature = "demo")]
+pub mod demo;
+
+#[cfg(any(feature = "clkdio", feature = "clkdiostb"))]
+use embedded_hal as hal;
 
 #[derive(Debug)]
 pub enum TmError {
@@ -26,72 +33,9 @@ pub enum TmError {
     Input,
 }
 
-#[inline]
-fn tm_bus_dio_wait_ack<DIO, D>(
-    dio: &mut DIO,
-    delay_us: &mut D,
-    bus_delay_us: u16,
-    expect_high: bool,
-    err: u8,
-) -> Result<(), TmError>
-where
-    DIO: InputPin + OutputPin,
-    D: FnMut(u16) -> (),
-{
-    for _ in 0..5 {
-        if expect_high == dio.is_high().map_err(|_| TmError::Dio)? {
-            return Ok(());
-        }
-        delay_us(bus_delay_us);
-    }
-
-    Err(TmError::Ack(err))
-}
-
-/// Expecting to have initial state on bus CLK is UP and DIO is UP.
-#[inline]
-fn tm_bus_start<DIO, CLK, D>(
-    dio: &mut DIO,
-    clk: &mut CLK,
-    delay_us: &mut D,
-    bus_delay_us: u16,
-) -> Result<(), TmError>
-where
-    DIO: InputPin + OutputPin,
-    CLK: OutputPin,
-    D: FnMut(u16) -> (),
-{
-    dio.set_low().map_err(|_| TmError::Dio)?;
-    delay_us(bus_delay_us);
-    Ok(())
-}
-
-#[inline]
-fn tm_bus_stop<DIO, CLK, D>(
-    dio: &mut DIO,
-    clk: &mut CLK,
-    delay_us: &mut D,
-    bus_delay_us: u16,
-) -> Result<(), TmError>
-where
-    DIO: InputPin + OutputPin,
-    CLK: OutputPin,
-    D: FnMut(u16) -> (),
-{
-    dio.set_low().map_err(|_| TmError::Dio)?;
-    delay_us(bus_delay_us);
-
-    clk.set_high().map_err(|_| TmError::Clk)?;
-    delay_us(bus_delay_us);
-
-    dio.set_high().map_err(|_| TmError::Dio)?;
-    tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, true, 255)?;
-    delay_us(bus_delay_us);
-    Ok(())
-}
-
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
+#[cfg(any(feature = "clkdio", feature = "clkdiostb"))]
 fn tm_bus_send<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -126,6 +70,7 @@ where
 
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
+#[cfg(all(feature = "key-scan", any(feature = "clkdio", feature = "clkdiostb")))]
 fn tm_bus_read<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -151,9 +96,77 @@ where
     Ok(byte)
 }
 
+#[inline]
+#[cfg(feature = "clkdio")]
+fn tm_bus_dio_wait_ack<DIO, D>(
+    dio: &mut DIO,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+    expect_high: bool,
+    err: u8,
+) -> Result<(), TmError>
+where
+    DIO: InputPin + OutputPin,
+    D: FnMut(u16) -> (),
+{
+    for _ in 0..5 {
+        if expect_high == dio.is_high().map_err(|_| TmError::Dio)? {
+            return Ok(());
+        }
+        delay_us(bus_delay_us);
+    }
+
+    Err(TmError::Ack(err))
+}
+
+/// Expecting to have initial state on bus CLK is UP and DIO is UP.
+#[inline]
+#[cfg(feature = "clkdio")]
+fn tm_bus_2wire_start<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+) -> Result<(), TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: FnMut(u16) -> (),
+{
+    dio.set_low().map_err(|_| TmError::Dio)?;
+    delay_us(bus_delay_us);
+    Ok(())
+}
+
+#[inline]
+#[cfg(feature = "clkdio")]
+fn tm_bus_2wire_stop<DIO, CLK, D>(
+    dio: &mut DIO,
+    clk: &mut CLK,
+    delay_us: &mut D,
+    bus_delay_us: u16,
+) -> Result<(), TmError>
+where
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin,
+    D: FnMut(u16) -> (),
+{
+    dio.set_low().map_err(|_| TmError::Dio)?;
+    delay_us(bus_delay_us);
+
+    clk.set_high().map_err(|_| TmError::Clk)?;
+    delay_us(bus_delay_us);
+
+    dio.set_high().map_err(|_| TmError::Dio)?;
+    tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, true, 255)?;
+    delay_us(bus_delay_us);
+    Ok(())
+}
+
 /// Should be called right after send
 #[inline]
-fn tm_bus_ack<DIO, CLK, D>(
+#[cfg(feature = "clkdio")]
+fn tm_bus_2wire_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     delay_us: &mut D,
@@ -195,7 +208,8 @@ where
 }
 
 #[inline]
-fn tm_bus_send_byte_ack<DIO, CLK, D>(
+#[cfg(feature = "clkdio")]
+fn tm_bus_2wire_send_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     delay_us: &mut D,
@@ -210,11 +224,12 @@ where
 {
     tm_bus_send(dio, clk, delay_us, bus_delay_us, byte)?;
     let verify_last = byte & COM_DATA_READ != COM_DATA_READ;
-    tm_bus_ack(dio, clk, delay_us, bus_delay_us, err_code, verify_last)
+    tm_bus_2wire_ack(dio, clk, delay_us, bus_delay_us, err_code, verify_last)
 }
 
 #[inline]
-fn tm_bus_read_byte_ack<DIO, CLK, D>(
+#[cfg(all(feature = "key-scan", feature = "clkdio"))]
+fn tm_bus_2wire_read_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     delay_us: &mut D,
@@ -236,6 +251,7 @@ where
 /// Accoding to datasheet it can be single commad byte or a sequence starting with command byte followed by several data bytes.
 ///
 #[inline]
+#[cfg(feature = "clkdio")]
 pub fn tm_send_bytes_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -248,19 +264,19 @@ where
     CLK: OutputPin,
     D: FnMut(u16) -> (),
 {
-    tm_bus_start(dio, clk, delay_us, bus_delay_us)?;
+    tm_bus_2wire_start(dio, clk, delay_us, bus_delay_us)?;
 
     let mut send = Err(TmError::Input);
     let mut iter = 10;
     for bt in bytes {
-        send = tm_bus_send_byte_ack(dio, clk, delay_us, bus_delay_us, bt.clone(), iter);
+        send = tm_bus_2wire_send_byte_ack(dio, clk, delay_us, bus_delay_us, bt.clone(), iter);
         if send.is_err() {
             break;
         }
         iter += 10;
     }
 
-    let stop = tm_bus_stop(dio, clk, delay_us, bus_delay_us);
+    let stop = tm_bus_2wire_stop(dio, clk, delay_us, bus_delay_us);
     if send.is_err() {
         send
     } else {
@@ -272,6 +288,7 @@ where
 /// Reads key scan data as byte via 2 wire interface (DIO,CLK).
 ///
 #[inline]
+#[cfg(all(feature = "key-scan", feature = "clkdio"))]
 pub fn tm_read_byte_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -287,7 +304,7 @@ where
 
     tm_bus_send_byte_ack(dio, clk, delay_us, bus_delay_us, COM_DATA_READ, 230)?;
 
-    let read = tm_bus_read_byte_ack(dio, clk, delay_us, bus_delay_us, 240);
+    let read = tm_bus_2wire_read_byte_ack(dio, clk, delay_us, bus_delay_us, 240);
 
     let stop = tm_bus_stop(dio, clk, delay_us, bus_delay_us);
     if stop.is_err() {
@@ -304,6 +321,7 @@ where
 /// Send bytes using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
+#[cfg(feature = "clkdiostb")]
 pub fn tm_send_bytes_3wire<DIO, CLK, STB, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -343,7 +361,8 @@ where
 /// Read **length** of bytes from MCU using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
-pub fn tm_read_bytes_3wire<'a, DIO, CLK, STB, D>(
+#[cfg(all(feature = "key-scan", feature = "clkdiostb"))]
+pub fn tm_read_bytes_3wire<DIO, CLK, STB, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     stb: &mut STB,
@@ -405,17 +424,17 @@ pub const TM1637_RESPONSE_SIZE: u8 = 1;
 /// Maximum number of display segments supported by this MCU.
 pub const TM1637_MAX_SEGMENTS: u8 = 6;
 
-/// Resonable delay for TM serial protocol.
-///
-/// This value should fit all configurations, but you can adjust it.
-/// Delay value may vary depending on your circuit (consider pull up resitors).
-pub const BUS_DELAY_US: u16 = 400;
-
 /// Prooven working delay for TM1637
 pub const TM1637_BUS_DELAY_US: u16 = 350;
 
 /// Prooven working delay for TM1638
 pub const TM1638_BUS_DELAY_US: u16 = 1;
+
+/// Resonable delay for TM serial protocol.
+///
+/// This value should fit all configurations, but you can adjust it.
+/// Delay value may vary depending on your circuit (consider pull up resitors).
+pub const BUS_DELAY_US: u16 = 400;
 
 /// Data control instruction set
 pub const COM_DATA: u8 = 0b01000000;
@@ -518,55 +537,4 @@ pub const CHAR_BRACKET_RIGHT: u8 = SEG_1 | SEG_2 | SEG_3 | SEG_4;
 /// List of digit characters where values correlates with array index 0-9.
 pub const DIGITS: [u8; 10] = [
     CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
-];
-
-/// List of all available characters including numbers
-pub const CHARS: [u8; 47] = [
-    CHAR_0,
-    CHAR_1,
-    CHAR_2,
-    CHAR_3,
-    CHAR_4,
-    CHAR_5,
-    CHAR_6,
-    CHAR_7,
-    CHAR_8,
-    CHAR_9,
-    CHAR_A,
-    CHAR_a,
-    CHAR_b,
-    CHAR_C,
-    CHAR_c,
-    CHAR_d,
-    CHAR_E,
-    CHAR_e,
-    CHAR_F,
-    CHAR_G,
-    CHAR_H,
-    CHAR_h,
-    CHAR_I,
-    CHAR_i,
-    CHAR_J,
-    CHAR_L,
-    CHAR_l,
-    CHAR_N,
-    CHAR_n,
-    CHAR_O,
-    CHAR_o,
-    CHAR_P,
-    CHAR_q,
-    CHAR_R,
-    CHAR_r,
-    CHAR_S,
-    CHAR_t,
-    CHAR_U,
-    CHAR_u,
-    CHAR_y,
-    CHAR_CYR_E,
-    CHAR_CYR_B,
-    CHAR_DEGREE,
-    CHAR_MINUS,
-    CHAR_UNDERSCORE,
-    CHAR_BRACKET_LEFT,
-    CHAR_BRACKET_RIGHT,
 ];
