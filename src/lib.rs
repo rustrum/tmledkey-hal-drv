@@ -6,10 +6,11 @@
 #![no_std]
 #![allow(non_upper_case_globals)]
 extern crate alloc;
-#[cfg(feature = "key-scan")]
+
+#[cfg(feature = "keys")]
 use alloc::vec::Vec;
 
-#[cfg(feature = "default")]
+#[cfg(feature = "utils")]
 pub mod utils;
 
 #[cfg(feature = "fx")]
@@ -18,8 +19,20 @@ pub mod fx;
 #[cfg(feature = "demo")]
 pub mod demo;
 
-#[cfg(any(feature = "clkdio", feature = "clkdiostb"))]
-use embedded_hal as hal;
+//  #[cfg(test)]
+//  #[cfg(feature = "demo")]
+//  #[macro_use]
+// extern crate std;
+// extern crate std;
+// use std::alloc::System;
+
+// #[global_allocator]
+// static A: System = System;
+
+use embedded_hal::digital::v2::{InputPin, OutputPin};
+
+#[cfg(not(any(feature = "clkdio", feature = "clkdiostb")))]
+compile_error!("Either feature \"clkdio\" or \"clkdiostb\" must be enabled for this crate. Otherwise there is no sence to use it");
 
 #[derive(Debug)]
 pub enum TmError {
@@ -35,7 +48,6 @@ pub enum TmError {
 
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
-#[cfg(any(feature = "clkdio", feature = "clkdiostb"))]
 fn tm_bus_send<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -70,7 +82,7 @@ where
 
 /// Expecting to have delay after start sequence or previous send call
 #[inline]
-#[cfg(all(feature = "key-scan", any(feature = "clkdio", feature = "clkdiostb")))]
+#[cfg(feature = "keys")]
 fn tm_bus_read<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -228,7 +240,7 @@ where
 }
 
 #[inline]
-#[cfg(all(feature = "key-scan", feature = "clkdio"))]
+#[cfg(all(feature = "keys", feature = "clkdio"))]
 fn tm_bus_2wire_read_byte_ack<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -242,7 +254,7 @@ where
     D: FnMut(u16) -> (),
 {
     let result = tm_bus_read(dio, clk, delay_us, bus_delay_us);
-    tm_bus_ack(dio, clk, delay_us, bus_delay_us, err_code, true)?;
+    tm_bus_2wire_ack(dio, clk, delay_us, bus_delay_us, err_code, true)?;
     result
 }
 
@@ -288,7 +300,7 @@ where
 /// Reads key scan data as byte via 2 wire interface (DIO,CLK).
 ///
 #[inline]
-#[cfg(all(feature = "key-scan", feature = "clkdio"))]
+#[cfg(all(feature = "keys", feature = "clkdio"))]
 pub fn tm_read_byte_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
@@ -300,13 +312,13 @@ where
     CLK: OutputPin,
     D: FnMut(u16) -> (),
 {
-    tm_bus_start(dio, clk, delay_us, bus_delay_us)?;
+    tm_bus_2wire_start(dio, clk, delay_us, bus_delay_us)?;
 
-    tm_bus_send_byte_ack(dio, clk, delay_us, bus_delay_us, COM_DATA_READ, 230)?;
+    tm_bus_2wire_send_byte_ack(dio, clk, delay_us, bus_delay_us, COM_DATA_READ, 230)?;
 
     let read = tm_bus_2wire_read_byte_ack(dio, clk, delay_us, bus_delay_us, 240);
 
-    let stop = tm_bus_stop(dio, clk, delay_us, bus_delay_us);
+    let stop = tm_bus_2wire_stop(dio, clk, delay_us, bus_delay_us);
     if stop.is_err() {
         if read.is_err() {
             return read;
@@ -361,7 +373,7 @@ where
 /// Read **length** of bytes from MCU using 3 wire interface (DIO,CLK,STB).
 ///
 #[inline]
-#[cfg(all(feature = "key-scan", feature = "clkdiostb"))]
+#[cfg(all(feature = "keys", feature = "clkdiostb"))]
 pub fn tm_read_bytes_3wire<DIO, CLK, STB, D>(
     dio: &mut DIO,
     clk: &mut CLK,

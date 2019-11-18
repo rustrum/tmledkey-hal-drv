@@ -15,8 +15,15 @@ keywords = ["tm1637", "led", "hal"]
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
 
 [features]
+# Almost all features are enabled by default.
+# If you need smaller binary you can use flag `default-features = false` and manually choose features you need.
+default=["utils", "clkdio", "clkdiostb", "fx"]
+
+# Nice utils functions
+utils=[]
+
 # Enable key scan functionality (reading data)
-key-scan=[]
+keys=[]
 
 # Enable 2 wire inteface CLK + DIO
 clkdio=[]
@@ -24,8 +31,8 @@ clkdio=[]
 # Enable 3 wire inteface CLK + DIO + STB
 clkdiostb=[]
 
-# Demo code that you probably would not need for your app
-demo=[]
+# Add animation effects helpers
+fx=[]
 
 # Demo code that you probably would not need for your app
-fx=[]
+demo=["clkdio", "clkdiostb", "keys", "utils", "fx"]

@@ -4,7 +4,16 @@ use alloc::vec::Vec;
 
 const CIRCLE: [u8; 6] = [SEG_1, SEG_2, SEG_3, SEG_4, SEG_5, SEG_6];
 
-pub trait Animation<R> {
+///
+/// Simple iterator-like animation functionality.
+///
+pub trait Animate<R> {
+    ///
+    /// Return next animation data (value), that you should send to MCU.
+    /// Delays and other stuff should be handled in your code.
+    ///
+    /// If animation completed returns `None` for infinite animations always returns something.
+    ///
     fn next(&mut self) -> Option<R>;
 }
 
@@ -33,16 +42,22 @@ impl Spinner {
     }
 }
 
-impl Animation<u8> for Spinner {
+impl Animate<u8> for Spinner {
     fn next(&mut self) -> Option<u8> {
         let mut res = 0_u8;
-        for i in 0..self.mask.len() {
-            let v = self.mask[(i + self.offset as usize) % self.mask.len()];
+        let max_i = self.mask.len();
+        for i in 0..max_i {
+            let ii = if self.cw {
+                (max_i + i - self.offset as usize) % max_i
+            } else {
+                (i + self.offset as usize) % max_i
+            };
+            let v = self.mask[ii];
             if v {
-                res |= CIRCLE[v as usize];
+                res |= CIRCLE[i];
             }
         }
-        self.offset = (self.offset + 1) % self.mask.len() as u8;
+        self.offset = (self.offset + 1) % max_i as u8;
         return Some(res);
     }
 }
@@ -79,7 +94,7 @@ impl Slide {
     }
 }
 
-impl Animation<Vec<u8>> for Slide {
+impl Animate<Vec<u8>> for Slide {
     fn next(&mut self) -> Option<Vec<u8>> {
         if self.count == 255 {
             // Do not support long words
@@ -122,7 +137,7 @@ impl Animation<Vec<u8>> for Slide {
             }
         }
 
-        if (off_in as usize) < self.word.len() {
+        if out.len() < self.result_len as usize && (off_in as usize) < self.word.len() {
             for i in 0..self.word.len() {
                 if i < off_in || i >= off_in + len_in {
                     continue;
@@ -147,5 +162,49 @@ impl Animation<Vec<u8>> for Slide {
         }
 
         return Some(out);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn animate_next<R>(ani: &mut dyn Animate<R>, steps: usize) -> Option<R> {
+        if steps <= 0 {
+            panic!("Wrong steps argument value = 0");
+        }
+        let mut last = None;
+        for _ in 0..steps {
+            last = ani.next();
+        }
+        last
+    }
+
+    #[test]
+    fn spinner_test() {
+        let init = CHAR_0 & !SEG_1;
+
+        let mut scw = Spinner::new(init.clone(), true);
+        assert_eq!(animate_next(&mut scw, 2).unwrap(), CHAR_0 & !SEG_2);
+        assert_eq!(animate_next(&mut scw, 4).unwrap(), CHAR_0 & !SEG_6);
+        assert_eq!(animate_next(&mut scw, 6).unwrap(), CHAR_0 & !SEG_6);
+        assert_eq!(animate_next(&mut scw, 3).unwrap(), CHAR_0 & !SEG_3);
+
+        let mut sccw = Spinner::new(init.clone(), false);
+        assert_eq!(animate_next(&mut sccw, 2).unwrap(), CHAR_0 & !SEG_6);
+        assert_eq!(animate_next(&mut sccw, 5).unwrap(), CHAR_0 & !SEG_1);
+        assert_eq!(animate_next(&mut sccw, 6).unwrap(), CHAR_0 & !SEG_1);
+        assert_eq!(animate_next(&mut sccw, 3).unwrap(), CHAR_0 & !SEG_4);
+    }
+
+    #[test]
+    fn slide_test() {
+        let init = [
+            CHAR_0, CHAR_1, CHAR_2, CHAR_3, CHAR_4, CHAR_5, CHAR_6, CHAR_7, CHAR_8, CHAR_9,
+        ];
+
+        let mut sstop = Slide::new(SlideType::StopAtFirstChar, 5, &init);
+        assert_eq!(sstop.next().unwrap(), [0; 5]);
+        assert_eq!(sstop.next().unwrap(), [0, 0, 0, 0, CHAR_0]);
     }
 }
