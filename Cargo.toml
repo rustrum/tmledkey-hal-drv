@@ -17,7 +17,7 @@ embedded-hal = { version = "0.2.3", features = ["unproven"] }
 [features]
 # Almost all features are enabled by default.
 # If you need smaller binary you can use flag `default-features = false` and manually choose features you need.
-default=["utils", "clkdio", "clkdiostb", "fx"]
+default=["utils", "clkdio", "clkdiostb", "fx","demo"]
 
 # Nice utils functions
 utils=[]

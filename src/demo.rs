@@ -1,6 +1,78 @@
 use super::fx::*;
 use super::*;
 
+pub struct Demo {
+    spin: Spinner,
+    slide: Slider,
+    displays: usize,
+    iter: usize,
+}
+
+impl Demo {
+    pub fn new(displays: u8) -> Demo {
+        let d = if displays <= 1 { 1 } else { displays - 1 };
+        Demo {
+            spin: Spinner::new((CHAR_0 & !SEG_1) & !SEG_4, true),
+            slide: Slider::new(SlideType::Cycle, d, &CHARS),
+            displays: displays as usize,
+            iter: 0,
+        }
+    }
+
+    pub fn next_state(&mut self) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        result.append(&mut self.slide.next().unwrap());
+        if self.displays > 1 {
+            result.push(self.spin.next().unwrap());
+        }
+        result
+    }
+
+    pub fn next_2wire<DIO, CLK, STB, D>(
+        &mut self,
+        dio: &mut DIO,
+        clk: &mut CLK,
+        delay_us: &mut D,
+        bus_delay_us: u16,
+    ) where
+        DIO: InputPin + OutputPin,
+        CLK: OutputPin,
+        D: FnMut(u16) -> (),
+    {
+        let mut out = self.next_state();
+        let mut bytes = Vec::new();
+        bytes.push(COM_ADDRESS);
+        bytes.append(&mut out);
+        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &bytes);
+
+        self.iter += 1;
+    }
+
+    pub fn next_3wire<DIO, CLK, STB, D>(
+        &mut self,
+        dio: &mut DIO,
+        clk: &mut CLK,
+        stb: &mut STB,
+        delay_us: &mut D,
+        bus_delay_us: u16,
+    ) where
+        DIO: InputPin + OutputPin,
+        CLK: OutputPin,
+        STB: OutputPin,
+        D: FnMut(u16) -> (),
+    {
+        let mut out = self.next_state();
+        let mut bytes = Vec::new();
+        bytes.push(COM_ADDRESS);
+        bytes.append(&mut out);
+        tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
+
+        // tm_read_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
+        self.iter += 1;
+    }
+}
+
 /// List of all available characters including numbers
 pub const CHARS: [u8; 47] = [
     CHAR_0,
