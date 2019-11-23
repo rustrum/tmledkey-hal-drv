@@ -1,14 +1,6 @@
-//#![deny(unsafe_code)]
 #![no_std]
 #![no_main]
-#![feature(alloc)]
-#![feature(global_allocator)]
 #![feature(lang_items)]
-
-#[macro_use]
-// Plug in the allocator crate
-extern crate alloc;
-extern crate alloc_cortex_m;
 
 use panic_halt as _;
 
@@ -19,23 +11,26 @@ use cortex_m_rt::{
 use cortex_m_semihosting::hprintln;
 use stm32f1xx_hal::{
     delay::Delay,
-    gpio,
-    gpio::{Floating, Input},
     pac,
     prelude::*,
 };
-//use dht_hal_drv::{dht_read, dht_split_init, dht_split_read, DhtError, DhtType, DhtValue};
+
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use core::alloc::Layout;
 use alloc_cortex_m::CortexMHeap;
-
-#[global_allocator]
-static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 use tmledkey_hal_drv::{
     self as tm,
     demo
 };
+
+
+// Plug in the allocator crate
+extern crate alloc;
+extern crate alloc_cortex_m;
+
+#[global_allocator]
+static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 #[entry]
 fn main() -> ! {
@@ -90,20 +85,33 @@ fn demo_2wire<LED, DIO,CLK>(
     DIO: InputPin + OutputPin,
     CLK: OutputPin 
 {
+    let delay_time = tm::TM1637_BUS_DELAY_US;
+
     hprintln!("Starting 2 wire demo (TM1637)");
 
     let mut demo = demo::Demo::new(4);
     let mut iter = 0;
 
-    let init_res = demo.init_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US);
+    let init_res = demo.init_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), delay_time);
 
     hprintln!("Display initialized {:?}", init_res);
 
-    tm::tm_send_bytes_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US, &[tm::COM_ADDRESS, tm::CHAR_0]);
+    tm::tm_send_bytes_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), delay_time, &[tm::COM_ADDRESS, tm::CHAR_0]);
 
+    let mut last_byte = 0_u8;
     loop {
-        demo.next_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US);
-        delay.delay_ms(50_u32);
+        let read = demo.next_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), delay_time);
+        match read {
+            Ok(byte) => {
+                if byte != last_byte {
+                hprintln!("Key scan read: {:04b}_{:04b}", byte>>4,  byte & 0xF);
+                last_byte = byte;
+                }
+            },
+            Err(e) => {hprintln!("Key scan read error {:?}", e);},
+        };
+
+        delay.delay_ms(25_u32);
 
         if iter % 2 == 0 {
             led.set_low();
@@ -112,13 +120,6 @@ fn demo_2wire<LED, DIO,CLK>(
         }
         iter += 1;
     }
-
-    /*
-    match read {
-        Ok(byte) => hprintln!("Byte readed: {:04b}_{:04b}", byte>>4,  byte & 0xF),
-        Err(e) => hprintln!("Read error {:?}", e),
-    };
-    */
 }
 
 // required: define how Out Of Memory (OOM) conditions should be handled

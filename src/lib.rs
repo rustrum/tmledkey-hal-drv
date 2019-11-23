@@ -436,8 +436,8 @@ pub const TM1637_RESPONSE_SIZE: u8 = 1;
 /// Maximum number of display segments supported by this MCU.
 pub const TM1637_MAX_SEGMENTS: u8 = 6;
 
-/// Prooven working delay for TM1637
-pub const TM1637_BUS_DELAY_US: u16 = 400;
+/// Prooven working delay for TM1637, it can be lower if you have appropriate pull-up resistor.
+pub const TM1637_BUS_DELAY_US: u16 = 475;
 
 /// Prooven working delay for TM1638
 pub const TM1638_BUS_DELAY_US: u16 = 1;

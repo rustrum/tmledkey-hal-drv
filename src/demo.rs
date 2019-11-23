@@ -37,7 +37,7 @@ impl Demo {
     {
         clk.set_high();
         dio.set_high();
-        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DATA_ADDRESS_ADD]);
+        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DATA_ADDRESS_ADD])?;
         tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DISPLAY_ON])
     }
 
@@ -69,7 +69,8 @@ impl Demo {
         clk: &mut CLK,
         delay_us: &mut D,
         bus_delay_us: u16,
-    ) where
+    ) -> Result<u8, TmError>
+    where
         DIO: InputPin + OutputPin,
         CLK: OutputPin,
         D: FnMut(u16) -> (),
@@ -78,12 +79,11 @@ impl Demo {
         let mut bytes = Vec::new();
         bytes.push(COM_ADDRESS);
         bytes.append(&mut out);
-        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &bytes);
+        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &bytes)?;
 
         self.iter += 1;
 
         if self.iter % 10 == 0 {
-            // delay_us(10_000);
             self.brightness = (self.brightness + 1) % 8;
             tm_send_bytes_2wire(
                 dio,
@@ -93,6 +93,8 @@ impl Demo {
                 &[COM_DISPLAY_ON | (self.brightness & DISPLAY_BRIGHTNESS_MASK)],
             );
         }
+
+        tm_read_byte_2wire(dio, clk, delay_us, bus_delay_us)
     }
 
     pub fn next_3wire<DIO, CLK, STB, D>(
