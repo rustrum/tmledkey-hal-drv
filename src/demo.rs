@@ -4,6 +4,7 @@ use super::*;
 pub struct Demo {
     spin: Spinner,
     slide: Slider,
+    slide_last: Vec<u8>,
     displays: usize,
     iter: usize,
 }
@@ -12,24 +13,55 @@ impl Demo {
     pub fn new(displays: u8) -> Demo {
         let d = if displays <= 1 { 1 } else { displays - 1 };
         Demo {
-            spin: Spinner::new((CHAR_0 & !SEG_1) & !SEG_4, true),
+            spin: Spinner::new(SEG_1, true),
             slide: Slider::new(SlideType::Cycle, d, &CHARS),
+            slide_last: Vec::new(),
             displays: displays as usize,
             iter: 0,
         }
     }
 
+    pub fn init_2wire<DIO, CLK, D>(
+        &mut self,
+        dio: &mut DIO,
+        clk: &mut CLK,
+        delay_us: &mut D,
+        bus_delay_us: u16,
+    ) -> Result<(), TmError>
+    where
+        DIO: InputPin + OutputPin,
+        CLK: OutputPin,
+        D: FnMut(u16) -> (),
+    {
+        clk.set_high();
+        dio.set_high();
+        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DATA_ADDRESS_ADD]);
+        tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DISPLAY_ON])
+    }
+
     pub fn next_state(&mut self) -> Vec<u8> {
         let mut result = Vec::new();
 
-        result.append(&mut self.slide.next().unwrap());
+        if self.iter % 3 == 0 {
+            self.slide_last = self.slide.next().unwrap();
+        }
+
+        result.append(&mut self.slide_last.clone());
         if self.displays > 1 {
             result.push(self.spin.next().unwrap());
         }
+
+        let off = self.iter % 3;
+        for i in 0..result.len() {
+            if (i + off) % 3 == 0 {
+                result[i] = result[i] | SEG_8;
+            }
+        }
+
         result
     }
 
-    pub fn next_2wire<DIO, CLK, STB, D>(
+    pub fn next_2wire<DIO, CLK, D>(
         &mut self,
         dio: &mut DIO,
         clk: &mut CLK,

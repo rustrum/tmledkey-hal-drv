@@ -1,10 +1,21 @@
 //#![deny(unsafe_code)]
 #![no_std]
 #![no_main]
+#![feature(alloc)]
+#![feature(global_allocator)]
+#![feature(lang_items)]
+
+#[macro_use]
+// Plug in the allocator crate
+extern crate alloc;
+extern crate alloc_cortex_m;
 
 use panic_halt as _;
 
-use cortex_m_rt::entry;
+use cortex_m_rt::{
+    entry,
+    heap_start
+};
 use cortex_m_semihosting::hprintln;
 use stm32f1xx_hal::{
     delay::Delay,
@@ -15,11 +26,25 @@ use stm32f1xx_hal::{
 };
 //use dht_hal_drv::{dht_read, dht_split_init, dht_split_read, DhtError, DhtType, DhtValue};
 use embedded_hal::digital::v2::{InputPin, OutputPin};
+use core::alloc::Layout;
+use alloc_cortex_m::CortexMHeap;
 
-use tmledkey_hal_drv as tm;
+#[global_allocator]
+static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
+
+use tmledkey_hal_drv::{
+    self as tm,
+    demo
+};
 
 #[entry]
 fn main() -> ! {
+    // Initialize the allocator BEFORE you use it
+    let start = heap_start() as usize;
+    let size = 1024; // in bytes
+    unsafe { ALLOCATOR.init(start, size) }
+
+
     // Get access to the core peripherals from the cortex-m crate
     let cp = cortex_m::Peripherals::take().unwrap();
     // Get access to the device specific peripherals from the peripheral access crate
@@ -49,71 +74,60 @@ fn main() -> ! {
     let mut tm_clk = gpiob.pb6.into_push_pull_output(&mut gpiob.crl);
     let mut tm_dio = gpiob.pb7.into_open_drain_output(&mut gpiob.crl);
 
-    tm_clk.set_high();
-    tm_dio.set_high();
+    // {
+    demo_2wire(&mut delay, &mut led, &mut tm_dio, &mut tm_clk)
+    // }
 
-    hprintln!("DIO pin state {}", tm_dio.is_high().unwrap());
+}
 
-    let mut bus_delay = || delay.delay_us(tm::BUS_DELAY_US);
+fn demo_2wire<LED, DIO,CLK>( 
+        delay: &mut Delay,
+        led: &mut LED,
+        dio: &mut DIO,
+        clk: &mut CLK,
+) -> ! where
+    LED: OutputPin,
+    DIO: InputPin + OutputPin,
+    CLK: OutputPin 
+{
+    hprintln!("Starting 2 wire demo (TM1637)");
 
-    let r = tm::tm_send_bytes(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut bus_delay,
-        &[tm::COM_DATA_ADDRESS_ADD],
-    );
-    hprintln!("Display initialized: {:?}", r);
-
-    let r = tm::tm_send_bytes(
-        &mut tm_dio,
-        &mut tm_clk,
-        &mut bus_delay,
-        &[tm::COM_DISPLAY_ON],
-    );
-    hprintln!("Brightness Init {:?}", r);
-
-    let mut nums: [u8; 5] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4];
+    let mut demo = demo::Demo::new(4);
     let mut iter = 0;
+
+    let init_res = demo.init_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US);
+
+    hprintln!("Display initialized {:?}", init_res);
+
+    tm::tm_send_bytes_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US, &[tm::COM_ADDRESS, tm::CHAR_0]);
+
     loop {
-        let mut bts: [u8; 5] = [0; 5];
-        bts[0] = nums[0];
-        for i in 1..nums.len() {
-            bts[i] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
-        }
+        demo.next_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), tm::TM1637_BUS_DELAY_US);
+        delay.delay_ms(50_u32);
 
-        let b = iter % 8;
-        let r = tm::tm_send_bytes(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut || delay.delay_us(tm::BUS_DELAY_US),
-            &[tm::COM_DISPLAY_ON | iter],
-        );
-
-        let pr = tm::tm_send_bytes(
-            &mut tm_dio,
-            &mut tm_clk,
-            &mut || delay.delay_us(tm::BUS_DELAY_US),
-            &bts,
-        );
-
-        let read = tm::tm_read_byte(&mut tm_dio, &mut tm_clk, &mut || {
-            delay.delay_us(tm::BUS_DELAY_US)
-        });
-
-        match read {
-            Ok(byte) => hprintln!("Byte readed: {:04b}_{:04b}", byte>>4,  byte & 0xF),
-            Err(e) => hprintln!("Read error {:?}", e),
-        };
-
-        delay.delay_ms(250_u16);
-        for i in 1..nums.len() {
-            nums[i] = nums[i] + 1;
-        }
         if iter % 2 == 0 {
             led.set_low();
         } else {
             led.set_high();
         }
         iter += 1;
+    }
+
+    /*
+    match read {
+        Ok(byte) => hprintln!("Byte readed: {:04b}_{:04b}", byte>>4,  byte & 0xF),
+        Err(e) => hprintln!("Read error {:?}", e),
+    };
+    */
+}
+
+// required: define how Out Of Memory (OOM) conditions should be handled
+// *if* no other crate has already defined `oom`
+#[lang = "oom"]
+#[no_mangle]
+pub fn rust_oom(layout: Layout) -> ! {
+    hprintln!("OOM happens {}", layout.size());
+    loop {
+
     }
 }
