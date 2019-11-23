@@ -7,6 +7,7 @@ pub struct Demo {
     slide_last: Vec<u8>,
     displays: usize,
     iter: usize,
+    brightness: u8,
 }
 
 impl Demo {
@@ -18,6 +19,7 @@ impl Demo {
             slide_last: Vec::new(),
             displays: displays as usize,
             iter: 0,
+            brightness: 0,
         }
     }
 
@@ -79,6 +81,18 @@ impl Demo {
         tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &bytes);
 
         self.iter += 1;
+
+        if self.iter % 10 == 0 {
+            // delay_us(10_000);
+            self.brightness = (self.brightness + 1) % 8;
+            tm_send_bytes_2wire(
+                dio,
+                clk,
+                delay_us,
+                bus_delay_us,
+                &[COM_DISPLAY_ON | (self.brightness & DISPLAY_BRIGHTNESS_MASK)],
+            );
+        }
     }
 
     pub fn next_3wire<DIO, CLK, STB, D>(
