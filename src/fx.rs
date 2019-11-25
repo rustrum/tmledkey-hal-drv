@@ -9,12 +9,14 @@ const CIRCLE: [u8; 6] = [SEG_1, SEG_2, SEG_3, SEG_4, SEG_5, SEG_6];
 ///
 pub trait Animate<R> {
     /// Return next animation payload (value), that you should send to MCU somehow.
-    /// Delays and other stuff should be handled in your code.
+    /// Delays between calls and other stuff should be handled in your code.
     ///
     /// If animation completed returns `None` for infinite animations always returns something.
     fn next(&mut self) -> Option<R>;
 }
 
+/// Stands for spinning segments round and round.
+/// Spinning path is the same as for ZERO digit.
 #[derive(Debug)]
 pub struct Spinner {
     offset: u8,
@@ -23,6 +25,11 @@ pub struct Spinner {
 }
 
 impl Spinner {
+    /// Creates new spinner
+    ///
+    /// Arguments:
+    ///  - `initial_mask` - consider it as ZERO without one segment or only one segment.
+    ///  - `clockwise` - rotation direction true for clockwise
     pub fn new(initial_mask: u8, clockwise: bool) -> Spinner {
         let mut init = [false; 6];
 
@@ -60,13 +67,18 @@ impl Animate<u8> for Spinner {
     }
 }
 
+/// Defines how to slide your "text"
 #[derive(Debug)]
 pub enum SlideType {
+    // Slides from behind last display to first, stops then fist character reaches first display
     StopAtFirstChar,
+    // Slides from behind last display to first, stops then last character moves behind first display
     StopAfterLastChar,
+    // Slides from last display to first with spacer equivalent to displays count
     Cycle,
 }
 
+/// Sliding animation from last display to first
 #[derive(Debug)]
 pub struct Slider {
     tp: SlideType,
@@ -76,6 +88,12 @@ pub struct Slider {
 }
 
 impl Slider {
+    /// Configure slider animation.
+    ///
+    /// Arguments:
+    ///  - `slide_type` - animation behaviour
+    ///  - `displays_count` - number of displays connected to MCU
+    ///  - `bytes_to_slide` - input bytes that should slide along displays
     pub fn new(slide_type: SlideType, displays_count: u8, bytes_to_slide: &[u8]) -> Slider {
         let mut word = Vec::<u8>::new();
 

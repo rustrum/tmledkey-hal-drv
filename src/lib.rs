@@ -1,11 +1,11 @@
 //#![deny(warnings)]
 //!
-//! More infromation about [7 segment displays](https://en.wikipedia.org/wiki/Seven-SEG_display)
+//! More information about [7 segment displays](https://en.wikipedia.org/wiki/Seven-SEG_display)
 //!
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
-#[cfg(any(feature = "utils", feature="fx", feature="demo"))]
+#[cfg(any(feature = "utils", feature = "fx", feature = "demo"))]
 extern crate alloc;
 
 #[cfg(feature = "utils")]
@@ -22,11 +22,13 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 #[cfg(not(any(feature = "clkdio", feature = "clkdiostb")))]
 compile_error!("Either feature \"clkdio\" or \"clkdiostb\" must be enabled for this crate. Otherwise there is no sence to use it");
 
+/// Describes possible error mostly related to low level interaction with MCU.
+/// At least it should give you an insight about what goes wrong.
 #[derive(Debug)]
 pub enum TmError {
     Dio,
     /// ACK error with tricky code.
-    /// Code could help to get more detaled information about exact place where error occured.
+    /// Code could help to get more detailed information about exact place where error occurred.
     Ack(u8),
     Clk,
     Stb,
@@ -200,7 +202,7 @@ where
 
     // Ensure DIO was released and now it is up
     if verify_last {
-        // No need to check last ack for reading mode
+        // No need to check last ACK for reading mode
         tm_bus_dio_wait_ack(dio, delay_us, bus_delay_us, true, err_code + 3)?;
     }
 
@@ -248,15 +250,20 @@ where
 
 ///
 /// Send one or several bytes to MCU via 2 wire interface (DIO,CLK).
-/// Accoding to datasheet it can be single commad byte or a sequence starting with command byte followed by several data bytes.
+/// According to datasheet it can be single command byte or a sequence starting with command byte followed by several data bytes.
 ///
+/// Arguments:
+///  - `dio`, `clk` - MCU interface pins
+///  - `delay_us` - closure that provides delay functionality
+///  - `delay_value` - delay value in us, depends of MCU you are using and circuit features
+///  - `bytes` - slice of bytes to send
 #[inline]
 #[cfg(feature = "clkdio")]
 pub fn tm_send_bytes_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     delay_us: &mut D,
-    bus_delay_us: u16,
+    delay_value: u16,
     bytes: &[u8],
 ) -> Result<(), TmError>
 where
@@ -264,19 +271,19 @@ where
     CLK: OutputPin,
     D: FnMut(u16) -> (),
 {
-    tm_bus_2wire_start(dio, clk, delay_us, bus_delay_us)?;
+    tm_bus_2wire_start(dio, clk, delay_us, delay_value)?;
 
     let mut send = Err(TmError::Input);
     let mut iter = 10;
     for bt in bytes {
-        send = tm_bus_2wire_send_byte_ack(dio, clk, delay_us, bus_delay_us, bt.clone(), iter);
+        send = tm_bus_2wire_send_byte_ack(dio, clk, delay_us, delay_value, bt.clone(), iter);
         if send.is_err() {
             break;
         }
         iter += 10;
     }
 
-    let stop = tm_bus_2wire_stop(dio, clk, delay_us, bus_delay_us);
+    let stop = tm_bus_2wire_stop(dio, clk, delay_us, delay_value);
     if send.is_err() {
         send
     } else {
@@ -287,26 +294,30 @@ where
 ///
 /// Reads key scan data as byte via 2 wire interface (DIO,CLK).
 ///
+/// Arguments:
+///  - `dio`, `clk` - MCU interface pins
+///  - `delay_us` - closure that provides delay functionality
+///  - `delay_value` - delay value in us, depends of MCU you are using and circuit features
 #[inline]
 #[cfg(all(feature = "keys", feature = "clkdio"))]
 pub fn tm_read_byte_2wire<DIO, CLK, D>(
     dio: &mut DIO,
     clk: &mut CLK,
     delay_us: &mut D,
-    bus_delay_us: u16,
+    delay_value: u16,
 ) -> Result<u8, TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
     D: FnMut(u16) -> (),
 {
-    tm_bus_2wire_start(dio, clk, delay_us, bus_delay_us)?;
+    tm_bus_2wire_start(dio, clk, delay_us, delay_value)?;
 
-    tm_bus_2wire_send_byte_ack(dio, clk, delay_us, bus_delay_us, COM_DATA_READ, 230)?;
+    tm_bus_2wire_send_byte_ack(dio, clk, delay_us, delay_value, COM_DATA_READ, 230)?;
 
-    let read = tm_bus_2wire_read_byte_ack(dio, clk, delay_us, bus_delay_us, 240);
+    let read = tm_bus_2wire_read_byte_ack(dio, clk, delay_us, delay_value, 240);
 
-    let stop = tm_bus_2wire_stop(dio, clk, delay_us, bus_delay_us);
+    let stop = tm_bus_2wire_stop(dio, clk, delay_us, delay_value);
     if stop.is_err() {
         if read.is_err() {
             return read;
@@ -320,6 +331,11 @@ where
 ///
 /// Send bytes using 3 wire interface (DIO,CLK,STB).
 ///
+/// Arguments:
+///  - `dio`, `clk`, `stb` - MCU interface pins
+///  - `delay_us` - closure that provides delay functionality
+///  - `delay_value` - delay value in us, depends of MCU you are using and your features
+///  - `bytes` - slice of bytes to send
 #[inline]
 #[cfg(feature = "clkdiostb")]
 pub fn tm_send_bytes_3wire<DIO, CLK, STB, D>(
@@ -327,7 +343,7 @@ pub fn tm_send_bytes_3wire<DIO, CLK, STB, D>(
     clk: &mut CLK,
     stb: &mut STB,
     delay_us: &mut D,
-    bus_delay_us: u16,
+    delay_value: u16,
     bytes: &[u8],
 ) -> Result<(), TmError>
 where
@@ -336,30 +352,36 @@ where
     STB: OutputPin,
     D: FnMut(u16) -> (),
 {
-    delay_us(bus_delay_us);
+    delay_us(delay_value);
     stb.set_low().map_err(|_| TmError::Stb)?;
-    delay_us(bus_delay_us);
+    delay_us(delay_value);
 
     let mut send = Err(TmError::Input);
     for bt in bytes {
-        send = tm_bus_send(dio, clk, delay_us, bus_delay_us, bt.clone());
+        send = tm_bus_send(dio, clk, delay_us, delay_value, bt.clone());
         if send.is_err() {
             break;
         }
         // Notice: When read data, set instruction from the 8th rising edge of clock
-        // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
+        // to CLK falling edge to read data that demand a waiting time T wait(min 1μS).
         //delayer();
     }
-    delay_us(bus_delay_us);
+    delay_us(delay_value);
     stb.set_high().map_err(|_| TmError::Stb)?;
     clk.set_high().map_err(|_| TmError::Stb)?;
     dio.set_high().map_err(|_| TmError::Stb)?;
     send
 }
 
+/// Read **read_count** of bytes into response array from MCU using 3 wire interface (DIO,CLK,STB).
 ///
-/// Read **length** of bytes from MCU using 3 wire interface (DIO,CLK,STB).
+/// Response array has fixed size of 4, so you can read up to 4 bytes there.
 ///
+/// Arguments:
+///  - `dio`, `clk`, `stb` - MCU interface pins
+///  - `delay_us` - closure that provides delay functionality
+///  - `delay_value` - delay value in us, depends of MCU you are using and circuit features
+///  - `read_count` - number of bytes to read into output array
 #[inline]
 #[cfg(all(feature = "keys", feature = "clkdiostb"))]
 pub fn tm_read_bytes_3wire<DIO, CLK, STB, D>(
@@ -367,8 +389,8 @@ pub fn tm_read_bytes_3wire<DIO, CLK, STB, D>(
     clk: &mut CLK,
     stb: &mut STB,
     delay_us: &mut D,
-    bus_delay_us: u16,
-    bytes_count: u8,
+    delay_value: u16,
+    read_count: u8,
 ) -> Result<[u8; 4], TmError>
 where
     DIO: InputPin + OutputPin,
@@ -379,24 +401,24 @@ where
     let mut read_err = None;
     let mut response = [0_u8; 4];
 
-    if bytes_count > response.len() as u8 {
+    if read_count <= 0 || read_count > response.len() as u8 {
         return Err(TmError::Input);
     }
 
-    delay_us(bus_delay_us);
+    delay_us(delay_value);
     stb.set_low().map_err(|_| TmError::Stb)?;
-    delay_us(bus_delay_us);
+    delay_us(delay_value);
 
-    let res_init = tm_bus_send(dio, clk, delay_us, bus_delay_us, COM_DATA_READ);
+    let res_init = tm_bus_send(dio, clk, delay_us, delay_value, COM_DATA_READ);
     dio.set_high().map_err(|_| TmError::Stb)?;
     if res_init.is_err() {
         read_err = Some(res_init.unwrap_err());
     } else {
         // Notice: When read data, set instruction from the 8th rising edge of clock
-        // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
-        delay_us(bus_delay_us);
-        for i in 0..(bytes_count as usize) {
-            match tm_bus_read(dio, clk, delay_us, bus_delay_us) {
+        // to CLK falling edge to read data that demand a waiting time T wait(min 1μS).
+        delay_us(delay_value);
+        for i in 0..(read_count as usize) {
+            match tm_bus_read(dio, clk, delay_us, delay_value) {
                 Ok(b) => {
                     response[i] = b;
                 }
@@ -428,17 +450,15 @@ pub const TM1637_RESPONSE_SIZE: u8 = 1;
 /// Maximum number of display segments supported by this MCU.
 pub const TM1637_MAX_SEGMENTS: u8 = 6;
 
-/// Prooven working delay for TM1637, it can be lower if you have appropriate pull-up resistor.
+/// Proven working delay for TM1637, it can be lower depending of your pull-up resistor characteristics.
 pub const TM1637_BUS_DELAY_US: u16 = 475;
 
-/// Prooven working delay for TM1638
+/// Proven working delay for TM1638
 pub const TM1638_BUS_DELAY_US: u16 = 1;
 
-/// Resonable delay for TM serial protocol.
-///
-/// This value should fit all configurations, but you can adjust it.
-/// Delay value may vary depending on your circuit (consider pull up resitors).
-pub const BUS_DELAY_US: u16 = 400;
+/// Universal delay for TM serial protocol.
+/// This value should fit all configurations, but you should prefer to use values that fits exact MCU chip version.
+pub const BUS_DELAY_US: u16 = 500;
 
 /// Data control instruction set
 pub const COM_DATA: u8 = 0b01000000;

@@ -12,16 +12,29 @@ At least next controller variants are exist on the market:
  * TM1640 - 2 wire interface, 16 displays, no keys
 
 This driver implements low level functions to send/read data with 2 or 3 wire interface.
-User friendly API would be implemented for popular controller models.
+User friendly API would be implemented for popular controller models later.
 
 
-# Project is in early development stage
+# Project status and future plans
 
-Right now it is working only with TM1637 using low level function to send bytes.
-
-Tested on hardware (look into examples folder):
+Available functionality:
+ * Support 2 and 3 wire interfaces, tested on TM1637 and TM1698
+ * Writing bytes to MCU
+ * Reading key scan bytes from MCU
+ * Basic utility and animation features are present
+ 
+Hardware crate was tested on:
+ * TM1637 clock module
+ * TM1638 module with 8 displays, 8 buttons and 8 additional LEDs
+ * STM32 Blue Pill
  * Raspberry Pi
- * STM32 blue pill
+
+Current functionality looks stable, but implementation is extremely low level.
+That is mostly because I see no reason to do more friendly API 
+until HAL and it's implementations would stabilize.
+So right now my basic goal is to keep it stable and working between HAL updates.
+I really do hope that is it not a big issue because current HAL state with embedded programming 
+is only for hardcore crazy masochist developers which should be OK with what I've done here.
 
 
 # Licensing

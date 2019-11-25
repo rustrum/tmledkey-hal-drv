@@ -1,3 +1,10 @@
+//! Demo feature aimed to quick functionality check.
+//! Do not use it in production code.
+//!
+//!
+//! It is require you to have properly configure global memory allocator.
+//! If you are developing for embedded devices
+//! than you probably does not have global memory allocator by default.
 use super::fx::*;
 use super::*;
 
@@ -37,8 +44,8 @@ impl Demo {
         CLK: OutputPin,
         D: FnMut(u16) -> (),
     {
-        clk.set_high();
-        dio.set_high();
+        clk.set_high().map_err(|_| TmError::Clk)?;
+        dio.set_high().map_err(|_| TmError::Dio)?;
         tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DATA_ADDRESS_ADD])?;
         tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DISPLAY_ON])
     }
@@ -57,9 +64,9 @@ impl Demo {
         STB: OutputPin,
         D: FnMut(u16) -> (),
     {
-        clk.set_high();
-        dio.set_high();
-        stb.set_high();
+        clk.set_high().map_err(|_| TmError::Clk)?;;
+        dio.set_high().map_err(|_| TmError::Dio)?;;
+        stb.set_high().map_err(|_| TmError::Stb)?;;
         tm_send_bytes_3wire(
             dio,
             clk,
@@ -121,7 +128,7 @@ impl Demo {
                 delay_us,
                 bus_delay_us,
                 &[COM_DISPLAY_ON | (self.brightness & DISPLAY_BRIGHTNESS_MASK)],
-            );
+            )?;
         }
 
         tm_read_byte_2wire(dio, clk, delay_us, bus_delay_us)
@@ -154,7 +161,7 @@ impl Demo {
             });
         }
 
-        tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
+        tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes)?;
 
         self.iter += 1;
         if self.iter % 10 == 0 {
@@ -166,7 +173,7 @@ impl Demo {
                 delay_us,
                 bus_delay_us,
                 &[COM_DISPLAY_ON | (self.brightness & DISPLAY_BRIGHTNESS_MASK)],
-            );
+            )?;
         }
         tm_read_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, 4)
     }
