@@ -76,18 +76,18 @@ impl Demo {
 
         if self.iter % 3 == 0 {
             self.slide_last = self.slide.next().unwrap();
+
+            let off = (self.iter / 3) % 4;
+            for i in 0..self.slide_last.len() {
+                if (i + off) % 4 == 0 {
+                    self.slide_last[i] = self.slide_last[i] | SEG_8;
+                }
+            }
         }
 
         result.append(&mut self.slide_last.clone());
         if self.displays > 1 {
             result.push(self.spin.next().unwrap());
-        }
-
-        let off = self.iter % 4;
-        for i in 0..result.len() {
-            if (i + off) % 4 == 0 {
-                result[i] = result[i] | SEG_8;
-            }
         }
 
         result
