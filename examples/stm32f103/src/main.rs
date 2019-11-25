@@ -96,8 +96,6 @@ fn demo_2wire<LED, DIO,CLK>(
 
     hprintln!("Display initialized {:?}", init_res);
 
-    tm::tm_send_bytes_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), delay_time, &[tm::COM_ADDRESS, tm::CHAR_0]);
-
     let mut last_byte = 0_u8;
     loop {
         let read = demo.next_2wire(dio, clk, &mut |d:u16| delay.delay_us(d), delay_time);
@@ -111,7 +109,7 @@ fn demo_2wire<LED, DIO,CLK>(
             Err(e) => {hprintln!("Key scan read error {:?}", e);},
         };
 
-        delay.delay_ms(25_u32);
+        delay.delay_ms(100_u32);
 
         if iter % 2 == 0 {
             led.set_low();

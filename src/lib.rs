@@ -5,10 +5,8 @@
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
+#[cfg(any(feature = "utils", feature="fx", feature="demo"))]
 extern crate alloc;
-
-#[cfg(feature = "keys")]
-use alloc::vec::Vec;
 
 #[cfg(feature = "utils")]
 pub mod utils;
@@ -18,16 +16,6 @@ pub mod fx;
 
 #[cfg(feature = "demo")]
 pub mod demo;
-
-//  #[cfg(test)]
-//  #[cfg(feature = "demo")]
-//  #[macro_use]
-// extern crate std;
-// extern crate std;
-// use std::alloc::System;
-
-// #[global_allocator]
-// static A: System = System;
 
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 
@@ -380,8 +368,8 @@ pub fn tm_read_bytes_3wire<DIO, CLK, STB, D>(
     stb: &mut STB,
     delay_us: &mut D,
     bus_delay_us: u16,
-    length: u8,
-) -> Result<Vec<u8>, TmError>
+    bytes_count: u8,
+) -> Result<[u8; 4], TmError>
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
@@ -389,7 +377,11 @@ where
     D: FnMut(u16) -> (),
 {
     let mut read_err = None;
-    let mut response = Vec::<u8>::with_capacity(length as usize);
+    let mut response = [0_u8; 4];
+
+    if bytes_count > response.len() as u8 {
+        return Err(TmError::Input);
+    }
 
     delay_us(bus_delay_us);
     stb.set_low().map_err(|_| TmError::Stb)?;
@@ -403,10 +395,10 @@ where
         // Notice: When read data, set instruction from the 8th rising edge of clock
         // to CLK falling edge to read data that demand a waiting time Twait(min 1μS).
         delay_us(bus_delay_us);
-        for _ in 0..length {
+        for i in 0..(bytes_count as usize) {
             match tm_bus_read(dio, clk, delay_us, bus_delay_us) {
                 Ok(b) => {
-                    response.push(b);
+                    response[i] = b;
                 }
                 Err(e) => {
                     read_err = Some(e);

@@ -11,7 +11,7 @@ use spin_sleep;
 use std::time;
 use void;
 
-use tmledkey_hal_drv as tm;
+use tmledkey_hal_drv::{self as tm, demo};
 
 /**
  * Raspberry pi does not have open drain pins so we have to emulate it.
@@ -220,7 +220,7 @@ where
         let mut bts: [u8; 5] = [0; 5];
         bts[0] = nums[0];
         for i in 1..nums.len() {
-            bts[i] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
+            bts[i] = demo::CHARS[(nums[i] as usize % demo::CHARS.len())];
         }
 
         let b = iter % 8;
@@ -276,75 +276,30 @@ fn demo_3_wire_start(dio_num: u8, clk_num: u8, stb_num: u8) {
     demo_3_wire_run(&mut tm_dio, &mut tm_clk, &mut tm_stb, &mut delayer);
 }
 
-fn demo_3_wire_run<DIO, CLK, STB, D>(dio: &mut DIO, clk: &mut CLK, stb: &mut STB, delayer: &mut D)
+fn demo_3_wire_run<DIO, CLK, STB, D>(dio: &mut DIO, clk: &mut CLK, stb: &mut STB, delay: &mut D)
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
     STB: OutputPin,
     D: DelayMs<u16> + DelayUs<u16>,
 {
-    let mut bus_delay = |us: u16| delayer.delay_us(us);
+    let delay_time = tm::TM1638_BUS_DELAY_US;
 
-    let r = tm::tm_send_bytes_3wire(
-        dio,
-        clk,
-        stb,
-        &mut bus_delay,
-        tm::TM1638_BUS_DELAY_US,
-        &[tm::COM_DATA_ADDRESS_ADD],
-    );
-    println!("Display initialized: {:?}", r);
+    println!("Starting 3 wire demo (TM1638)");
+    let mut demo = demo::Demo::new(8);
+    let init_res = demo.init_3wire(dio, clk, stb, &mut |d: u16| delay.delay_us(d), delay_time);
+    println!("Display initialized {:?}", init_res);
 
-    let r = tm::tm_send_bytes_3wire(
-        dio,
-        clk,
-        stb,
-        &mut bus_delay,
-        tm::TM1638_BUS_DELAY_US,
-        &[tm::COM_DISPLAY_ON],
-    );
-    println!("Brightness Inited {:?}", r);
-
-    let mut nums: [u8; 9] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4, 5, 6, 7, 8];
-    let mut iter = 0;
-    let mut key_scan: Vec<u8> = Vec::new();
+    let mut last_read = [0_u8; 4];
     loop {
-        let mut bts: [u8; 17] = [0; 17];
-        bts[0] = nums[0];
-        for i in 1..nums.len() {
-            bts[(i - 1) * 2 + 1] = tm::CHARS[(nums[i] as usize % tm::CHARS.len())];
-        }
-
-        let b = iter % 8;
-        let r = tm::tm_send_bytes_3wire(
-            dio,
-            clk,
-            stb,
-            &mut bus_delay,
-            tm::TM1638_BUS_DELAY_US,
-            &[tm::COM_DISPLAY_ON | b],
-        );
-
-        let pr =
-            tm::tm_send_bytes_3wire(dio, clk, stb, &mut bus_delay, tm::TM1638_BUS_DELAY_US, &bts);
-
-        let read = tm::tm_read_bytes_3wire(
-            dio,
-            clk,
-            stb,
-            &mut bus_delay,
-            tm::TM1638_BUS_DELAY_US,
-            tm::TM1638_RESPONSE_SIZE,
-        );
-
+        let read = demo.next_3wire(dio, clk, stb, &mut |d: u16| delay.delay_us(d), delay_time);
         match read {
             Ok(bytes) => {
-                if bytes != key_scan {
-                    key_scan = bytes;
-
+                if bytes != last_read {
+                    last_read = bytes;
                     println!(
                         "Bytes read: {}",
-                        key_scan
+                        last_read
                             .clone()
                             .into_iter()
                             .map(|b| format!("{:04b}_{:04b}", b >> 4, b & 0xF))
@@ -353,13 +308,11 @@ where
                     )
                 }
             }
-            Err(e) => println!("Read error {:?}", e),
+            Err(e) => {
+                println!("Key scan read error {:?}", e);
+            }
         };
 
-        spin_sleep::sleep(time::Duration::from_millis(400));
-        for i in 1..nums.len() {
-            nums[i] = nums[i] + 1;
-        }
-        iter += 1;
+        delay.delay_ms(100_u16);
     }
 }

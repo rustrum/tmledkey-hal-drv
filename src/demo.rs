@@ -1,6 +1,8 @@
 use super::fx::*;
 use super::*;
 
+use alloc::vec::Vec;
+
 pub struct Demo {
     spin: Spinner,
     slide: Slider,
@@ -41,6 +43,34 @@ impl Demo {
         tm_send_bytes_2wire(dio, clk, delay_us, bus_delay_us, &[COM_DISPLAY_ON])
     }
 
+    pub fn init_3wire<DIO, CLK, STB, D>(
+        &mut self,
+        dio: &mut DIO,
+        clk: &mut CLK,
+        stb: &mut STB,
+        delay_us: &mut D,
+        bus_delay_us: u16,
+    ) -> Result<(), TmError>
+    where
+        DIO: InputPin + OutputPin,
+        CLK: OutputPin,
+        STB: OutputPin,
+        D: FnMut(u16) -> (),
+    {
+        clk.set_high();
+        dio.set_high();
+        stb.set_high();
+        tm_send_bytes_3wire(
+            dio,
+            clk,
+            stb,
+            delay_us,
+            bus_delay_us,
+            &[COM_DATA_ADDRESS_ADD],
+        )?;
+        tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &[COM_DISPLAY_ON])
+    }
+
     pub fn next_state(&mut self) -> Vec<u8> {
         let mut result = Vec::new();
 
@@ -53,9 +83,9 @@ impl Demo {
             result.push(self.spin.next().unwrap());
         }
 
-        let off = self.iter % 3;
+        let off = self.iter % 4;
         for i in 0..result.len() {
-            if (i + off) % 3 == 0 {
+            if (i + off) % 4 == 0 {
                 result[i] = result[i] | SEG_8;
             }
         }
@@ -104,20 +134,36 @@ impl Demo {
         stb: &mut STB,
         delay_us: &mut D,
         bus_delay_us: u16,
-    ) where
+    ) -> Result<[u8; 4], TmError>
+    where
         DIO: InputPin + OutputPin,
         CLK: OutputPin,
         STB: OutputPin,
         D: FnMut(u16) -> (),
     {
-        let mut out = self.next_state();
+        let out = self.next_state();
         let mut bytes = Vec::new();
         bytes.push(COM_ADDRESS);
-        bytes.append(&mut out);
+        for i in 0..out.len() {
+            bytes.push(out[i]);
+            bytes.push(0);
+        }
+
         tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
 
-        // tm_read_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
         self.iter += 1;
+        if self.iter % 10 == 0 {
+            self.brightness = (self.brightness + 1) % 8;
+            tm_send_bytes_3wire(
+                dio,
+                clk,
+                stb,
+                delay_us,
+                bus_delay_us,
+                &[COM_DISPLAY_ON | (self.brightness & DISPLAY_BRIGHTNESS_MASK)],
+            );
+        }
+        tm_read_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, 4)
     }
 }
 

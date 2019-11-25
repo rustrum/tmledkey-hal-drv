@@ -12,7 +12,7 @@ At least next controller variants are exist on the market:
  * TM1640 - 2 wire interface, 16 displays, no keys
 
 This driver implements low level functions to send/read data with 2 or 3 wire interface.
-User frienly API would be implemented for popular controller models.
+User friendly API would be implemented for popular controller models.
 
 
 # Project is in early development stage
