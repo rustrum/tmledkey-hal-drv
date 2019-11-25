@@ -144,9 +144,14 @@ impl Demo {
         let out = self.next_state();
         let mut bytes = Vec::new();
         bytes.push(COM_ADDRESS);
+        let off = self.iter % 10;
         for i in 0..out.len() {
             bytes.push(out[i]);
-            bytes.push(0);
+            bytes.push(if (i + 10 - off) % 10 == 0 {
+                SEG_9 | SEG_10 | SEG_11 | SEG_12
+            } else {
+                0
+            });
         }
 
         tm_send_bytes_3wire(dio, clk, stb, delay_us, bus_delay_us, &bytes);
