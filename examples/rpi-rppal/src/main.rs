@@ -6,6 +6,7 @@ use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     digital::v2::{InputPin, OutputPin},
 };
+
 use rppal::gpio::{Gpio, IoPin, Mode};
 use spin_sleep;
 use std::time;
@@ -15,6 +16,7 @@ use tmledkey_hal_drv::{self as tm, demo};
 
 /**
  * Raspberry pi does not have open drain pins so we have to emulate it.
+ * rppal unfortunately is not able to emulate such pins.
  */
 struct OpenPin {
     iopin: IoPin,
@@ -45,7 +47,6 @@ impl OpenPin {
     }
 }
 
-// Current rppal implementation does not support embedded_hal::gpio::v2 pins API.
 impl InputPin for OpenPin {
     type Error = void::Void;
 
@@ -59,7 +60,6 @@ impl InputPin for OpenPin {
     }
 }
 
-// Current rppal implementation does not support embedded_hal::gpio::v2 pins API.
 impl OutputPin for OpenPin {
     type Error = void::Void;
 
@@ -72,24 +72,6 @@ impl OutputPin for OpenPin {
     fn set_high(&mut self) -> Result<(), Self::Error> {
         self.iopin.set_high();
         self.switch_input();
-        Ok(())
-    }
-}
-
-struct OutPin {
-    pin: rppal::gpio::OutputPin,
-}
-// Current rppal implementation does not support embedded_hal::gpio::v2 pins API.
-impl OutputPin for OutPin {
-    type Error = void::Void;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.pin.set_low();
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.pin.set_high();
         Ok(())
     }
 }
@@ -122,6 +104,9 @@ fn cli_matches() -> ArgMatches<'static> {
         .get_matches()
 }
 
+/**
+ * rppal delays would not work because it use thread::sleep that does not provide accurate delays
+ */
 struct Delayer;
 
 impl DelayUs<u16> for Delayer {
@@ -171,7 +156,7 @@ fn main() {
 fn demo_2_wire_start(dio_num: u8, clk_num: u8) {
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
-    let clk = gpio
+    let mut clk = gpio
         .get(clk_num)
         .expect("Was not able to get CLK pin")
         .into_output();
@@ -182,77 +167,47 @@ fn demo_2_wire_start(dio_num: u8, clk_num: u8) {
         .into_io(Mode::Input);
 
     let mut tm_dio = OpenPin::new(dio);
-    let mut tm_clk = OutPin { pin: clk };
     let mut delay = Delayer {};
 
-    demo_2_wire_run(&mut tm_dio, &mut tm_clk, &mut delay);
+    demo_2_wire_run(&mut tm_dio, &mut clk, &mut delay);
 }
 
-fn demo_2_wire_run<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, delayer: &mut D)
+fn demo_2_wire_run<DIO, CLK, D>(dio: &mut DIO, clk: &mut CLK, delay: &mut D)
 where
     DIO: InputPin + OutputPin,
     CLK: OutputPin,
     D: DelayMs<u16> + DelayUs<u16>,
 {
-    let mut bus_delay = |us: u16| delayer.delay_us(us);
+    let delay_time = tm::TM1637_BUS_DELAY_US;
 
-    let r = tm::tm_send_bytes_2wire(
-        dio,
-        clk,
-        &mut bus_delay,
-        tm::TM1637_BUS_DELAY_US,
-        &[tm::COM_DATA_ADDRESS_ADD],
-    );
-    println!("Display initialized: {:?}", r);
+    println!("Starting 3 wire demo (TM1637)");
+    let mut demo = demo::Demo::new(4);
+    let init_res = demo.init_2wire(dio, clk, &mut |d: u16| delay.delay_us(d), delay_time);
+    println!("Display initialized {:?}", init_res);
 
-    let r = tm::tm_send_bytes_2wire(
-        dio,
-        clk,
-        &mut bus_delay,
-        tm::TM1637_BUS_DELAY_US,
-        &[tm::COM_DISPLAY_ON],
-    );
-    println!("Brightness Init {:?}", r);
-
-    let mut nums: [u8; 5] = [tm::COM_ADDRESS | 0, 1, 2, 3, 4];
-    let mut iter = 0;
+    let mut last_read = 0;
     loop {
-        let mut bts: [u8; 5] = [0; 5];
-        bts[0] = nums[0];
-        for i in 1..nums.len() {
-            bts[i] = demo::CHARS[(nums[i] as usize % demo::CHARS.len())];
-        }
-
-        let b = iter % 8;
-        let r = tm::tm_send_bytes_2wire(
-            dio,
-            clk,
-            &mut bus_delay,
-            tm::TM1637_BUS_DELAY_US,
-            &[tm::COM_DISPLAY_ON | b],
-        );
-
-        let pr = tm::tm_send_bytes_2wire(dio, clk, &mut bus_delay, tm::TM1637_BUS_DELAY_US, &bts);
-
-        let read = tm::tm_read_byte_2wire(dio, clk, &mut bus_delay, tm::TM1637_BUS_DELAY_US);
-
+        let read = demo.next_2wire(dio, clk, &mut |d: u16| delay.delay_us(d), delay_time);
         match read {
-            Ok(byte) => println!("Byte readed: {:04b}_{:04b}", byte >> 4, byte & 0xF),
-            Err(e) => println!("Read error {:?}", e),
+            Ok(byte) => {
+                if byte != last_read {
+                    last_read = byte;
+                    println!("Key scan read: {:04b}_{:04b}", byte >> 4, byte & 0xF)
+                }
+            }
+            Err(e) => {
+                println!("Key scan read error {:?}", e);
+            }
         };
 
-        spin_sleep::sleep(time::Duration::from_millis(400));
-        for i in 1..nums.len() {
-            nums[i] = nums[i] + 1;
-        }
-        iter += 1;
+        delay.delay_ms(75_u16);
     }
 }
 
 fn demo_3_wire_start(dio_num: u8, clk_num: u8, stb_num: u8) {
     let gpio = Gpio::new().expect("Can not init Gpio structure");
 
-    let clk = gpio
+    let mut clk = gpio
         .get(clk_num)
         .expect("Was not able to get CLK pin")
         .into_output();
@@ -262,18 +217,16 @@ fn demo_3_wire_start(dio_num: u8, clk_num: u8, stb_num: u8) {
         .expect("Was not able to get CLK pin")
         .into_io(Mode::Input);
 
-    let stb = gpio
+    let mut stb = gpio
         .get(stb_num)
         .expect("Was not able to get STB pin")
         .into_output();
 
     let mut tm_dio = OpenPin::new(dio);
-    let mut tm_clk = OutPin { pin: clk };
-    let mut tm_stb = OutPin { pin: stb };
 
     let mut delayer = Delayer {};
 
-    demo_3_wire_run(&mut tm_dio, &mut tm_clk, &mut tm_stb, &mut delayer);
+    demo_3_wire_run(&mut tm_dio, &mut clk, &mut stb, &mut delayer);
 }
 
 fn demo_3_wire_run<DIO, CLK, STB, D>(dio: &mut DIO, clk: &mut CLK, stb: &mut STB, delay: &mut D)
@@ -298,7 +251,7 @@ where
                 if bytes != last_read {
                     last_read = bytes;
                     println!(
-                        "Bytes read: {}",
+                        "Key scan read: {}",
                         last_read
                             .clone()
                             .into_iter()

@@ -1,16 +1,13 @@
 [package]
 name = "rpi-rppal"
-version = "0.1.0"
+version = "0.4.2-snapshot"
 authors = ["Rumato Estorsky"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 clap = "2.33.0"
 void = "1.0.2"
 spin_sleep = "0.3.7"
-rppal = { version = "0.11.3"}
-# rppal = { version = "0.11.3", features = ["hal", "hal-unproven"] }
+rppal = { version = "0.11.3", features = ["hal", "hal-unproven"]}
 embedded-hal = { version="0.2.3", features = ["unproven"]}
 tmledkey-hal-drv = { version="0.1.0", path  = "../../", features = ["demo"] }

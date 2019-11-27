@@ -20,7 +20,7 @@ pub mod demo;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 
 #[cfg(not(any(feature = "clkdio", feature = "clkdiostb")))]
-compile_error!("Either feature \"clkdio\" or \"clkdiostb\" must be enabled for this crate. Otherwise there is no sence to use it");
+compile_error!("Either feature \"clkdio\" or \"clkdiostb\" must be enabled for this crate. Otherwise there is no reason to use it");
 
 /// Describes possible error mostly related to low level interaction with MCU.
 /// At least it should give you an insight about what goes wrong.
@@ -135,6 +135,7 @@ where
     CLK: OutputPin,
     D: FnMut(u16) -> (),
 {
+    clk.set_high().map_err(|_| TmError::Clk)?;
     dio.set_low().map_err(|_| TmError::Dio)?;
     delay_us(bus_delay_us);
     Ok(())
