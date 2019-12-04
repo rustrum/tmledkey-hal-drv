@@ -5,7 +5,8 @@ authors = ["Rumato Estorsky <rumatoest@users.noreply.github.com>"]
 edition = "2018"
 doctest = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+dioclkstb=[]
 
 [dependencies]
 tmledkey-hal-drv = { version="0.1.0", path  = "../../", features = ["demo"] }

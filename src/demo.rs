@@ -64,9 +64,9 @@ impl Demo {
         STB: OutputPin,
         D: FnMut(u16) -> (),
     {
-        clk.set_high().map_err(|_| TmError::Clk)?;;
-        dio.set_high().map_err(|_| TmError::Dio)?;;
-        stb.set_high().map_err(|_| TmError::Stb)?;;
+        clk.set_high().map_err(|_| TmError::Clk)?;
+        dio.set_high().map_err(|_| TmError::Dio)?;
+        stb.set_high().map_err(|_| TmError::Stb)?;
         tm_send_bytes_3wire(
             dio,
             clk,
