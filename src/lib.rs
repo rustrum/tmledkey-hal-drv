@@ -1,7 +1,48 @@
-//#![deny(warnings)]
+//! This crate provides interface to work with Titanmec LED drives for [7 segment displays](https://en.wikipedia.org/wiki/Seven-SEG_display).
+//! Titanmec produce different types of MCUs that are using common 2 pin or 3 pin serial like interfaces.
+//! The most popular models for DIY projects are TM1637 and TM1638.
+//! Besides display driver capabilities this MCUs are also provide key-scan functionality.
 //!
-//! More information about [7 segment displays](https://en.wikipedia.org/wiki/Seven-SEG_display)
+//! This driver utilize embedded_hal functionality, thus it could work on different kind of hardware via HAL.
 //!
+//! # This is low level API
+//! **Read data sheet first** if you want to understand how to work with MCU.
+//! API provided here only wraps data transfer protocols.
+//! You still have to send and receive raw data as bytes.
+//! In order to understand meaning of this bytes you should have some knowledges.
+//!
+//! # Need code examples?
+//! Just explore repository [examples folder](https://github.com/rust-rum/tmledkey-hal-drv).
+//!
+//! *I just have no capacity to maintain actual code samples in every place.*
+//!
+//! # Features
+//!
+//! Plenty functionality of this library are splitted into features.
+//! I hope that it may help to reduce resulted firmware size.
+//!
+//! - *cldkio* - functions to work with 2 wire interfaces
+//! - *clkdiostb* - functions to work with 3 wire interfaces
+//! - *keys* - key scan support
+//! - *fx* - stands for *fx* module
+//! - *utils* - stands for *utils* module
+//!
+//! You should look into Cargo.toml in [source code](https://github.com/rust-rum/tmledkey-hal-drv)
+//! to get better understanding how does this features combined together.
+//!
+//! # Handling delays
+//!
+//! I've found out that handling delays is a very tricky for some hardware.
+//! Plus HAL implementation gives DelayXX and Timer traits thus it is not obvious what kind of trait should be preferred.
+//!
+//! In order to simplify delay approach I decided that
+//! **you have to implement delay logic on your side** and wrap it in lambda.
+//! It is up to you what kind of delay approach you will use.
+//! Just keep in mind that delays have to be precise.
+//!
+//! Some functions accepts delay value as input parameter.
+//! It is kinda weird, but it would allow you to reduce bus communication delays if your circuit configuration allows you to.
+//! In other cases you can use pre defined delay values.
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
@@ -249,8 +290,8 @@ where
     result
 }
 
-///
 /// Send one or several bytes to MCU via 2 wire interface (DIO,CLK).
+///
 /// According to datasheet it can be single command byte or a sequence starting with command byte followed by several data bytes.
 ///
 /// Arguments:
@@ -292,7 +333,6 @@ where
     }
 }
 
-///
 /// Reads key scan data as byte via 2 wire interface (DIO,CLK).
 ///
 /// Arguments:
@@ -329,8 +369,13 @@ where
     read
 }
 
-///
 /// Send bytes using 3 wire interface (DIO,CLK,STB).
+///
+/// According to datasheet it can be single command byte or a sequence starting with command byte followed by several data bytes.
+///
+/// **Keep in mind** that for this interface you should send 2 bytes for each display.
+/// For TM1638 second byte stands for segments 9-12 which has no meaning for 8 segment display.
+/// Thus in most cases you would send each 2nd data byte as empty.
 ///
 /// Arguments:
 ///  - `dio`, `clk`, `stb` - MCU interface pins

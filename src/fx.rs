@@ -1,3 +1,13 @@
+//! Set of very simple effects for LED displays.
+//!
+//! Animations are low level primitives that works next way:
+//!
+//!  1. You have to create animation structure
+//!  1. Now you should treat any animation as `Animate` trait
+//!  1. Retrieve next `Animate` state in cycle
+//!  1. Feed next animation state to MCUs
+//!  1. Do not forget to provide delays in animation cycle
+//!
 use super::*;
 
 use alloc::vec::Vec;
@@ -11,11 +21,12 @@ pub trait Animate<R> {
     /// Return next animation payload (value), that you should send to MCU somehow.
     /// Delays between calls and other stuff should be handled in your code.
     ///
-    /// If animation completed returns `None` for infinite animations always returns something.
+    /// If animation completed returns `None`.
+    /// For infinite animations always returns something.
     fn next(&mut self) -> Option<R>;
 }
 
-/// Stands for spinning segments round and round.
+/// Stands for spinning segments in one display round and round.
 /// Spinning path is the same as for ZERO digit.
 #[derive(Debug)]
 pub struct Spinner {
@@ -70,15 +81,15 @@ impl Animate<u8> for Spinner {
 /// Defines how to slide your "text"
 #[derive(Debug)]
 pub enum SlideType {
-    // Slides from behind last display to first, stops then fist character reaches first display
+    /// Slides from behind last display to first, stops then fist character reaches first display.
     StopAtFirstChar,
-    // Slides from behind last display to first, stops then last character moves behind first display
+    /// Slides from behind last display to first, stops then last character moves behind first display.
     StopAfterLastChar,
-    // Slides from last display to first with spacer equivalent to displays count
+    /// Infinite slide from last display to first. Empty distance between first and last chars equivalent to total displays count.
     Cycle,
 }
 
-/// Sliding animation from last display to first
+/// Sliding animation from last display to first (from right to left).
 #[derive(Debug)]
 pub struct Slider {
     tp: SlideType,

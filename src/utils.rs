@@ -1,3 +1,5 @@
+//! Helpful functions to work with MCUs raw data.
+//!
 //! Utility functions are depended on `Vec` which is require you
 //! to have properly configure global memory allocator.
 //!
