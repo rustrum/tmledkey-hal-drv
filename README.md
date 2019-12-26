@@ -36,6 +36,15 @@ So right now my basic goal is to keep it stable and working between HAL updates.
 I really do hope that is it not a big issue because current HAL state with embedded programming 
 is only for hardcore crazy masochist developers which should be OK with what I've done here.
 
+# Examples
+
+This is how code from examples works. 
+
+Click on image to view animation.
+
+<a href="https://rust-rum.github.io/tmledkey-hal-drv/tm1637.gif" target="_blank"><img alt="TM1637 example" src="https://rust-rum.github.io/tmledkey-hal-drv/tm1637.jpg" /></a>
+
+<a href="https://rust-rum.github.io/tmledkey-hal-drv/tm1638.gif" target="_blank"><img  alt="TM1638 example" src="https://rust-rum.github.io/tmledkey-hal-drv/tm1638.jpg" /></a>
 
 # Licensing
 This product is licenses under **almost MIT license** but with plumbus exception.
