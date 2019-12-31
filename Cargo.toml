@@ -17,10 +17,10 @@ embedded-hal = { version = "0.2.3", features = ["unproven"] }
 [features]
 # Features that require global_allocator are not enabled by default.
 # If you need smaller binary you can use flag `default-features = false` and manually choose features you need.
-default=["utils", "clkdio", "clkdiostb"]
+default=["clkdio", "clkdiostb"]
 
-# Nice utils functions
-utils=[]
+# Global allocator functions
+alloc=[]
 
 # Enable key scan functionality (reading data)
 keys=[]
@@ -32,7 +32,7 @@ clkdio=[]
 clkdiostb=[]
 
 # Add animation effects helpers
-fx=[]
+fx=["alloc"]
 
 # Demo code that you probably would not be needeed for production code
-demo=["clkdio", "clkdiostb", "keys", "utils", "fx"]
+demo=["clkdio", "clkdiostb", "keys", "fx", "alloc"]

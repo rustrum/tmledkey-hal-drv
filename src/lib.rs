@@ -46,10 +46,9 @@
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
-#[cfg(any(feature = "utils", feature = "fx", feature = "demo"))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "utils")]
 pub mod utils;
 
 #[cfg(feature = "fx")]
