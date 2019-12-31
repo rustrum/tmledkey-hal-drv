@@ -204,7 +204,7 @@ fn fractional_part_to_bytes(value: f32, precision: u8) -> IntConvertResult {
         if zeroes >= 4 {
             // Skip further processing 4 or more zeroes chain found
             // Quick hack to avoid float garbage
-            for i in 1..=zeroes {
+            for _ in 1..=zeroes {
                 result.remove_last();
             }
             break;
