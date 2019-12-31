@@ -138,7 +138,6 @@ where
     Ok(byte)
 }
 
-#[inline]
 #[cfg(feature = "clkdio")]
 fn tm_bus_dio_wait_ack<DIO, D>(
     dio: &mut DIO,
@@ -207,7 +206,6 @@ where
 }
 
 /// Should be called right after send
-#[inline]
 #[cfg(feature = "clkdio")]
 fn tm_bus_2wire_ack<DIO, CLK, D>(
     dio: &mut DIO,

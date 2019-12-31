@@ -1,4 +1,5 @@
 //! Set of very simple effects for LED displays.
+//! 
 //! **Depens on "galloc"** feature (global allocator) to be available because of using `Vec`.
 //!
 //! Animations are low level primitives that works next way:

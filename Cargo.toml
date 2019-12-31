@@ -9,7 +9,7 @@ documentation = "https://docs.rs/tmledkey-hal-drv"
 license-file = "LICENSE"
 readme = "README.md"
 categories = ["embedded", "no-std"]
-keywords = ["tm1637", "led", "hal"]
+keywords = ["tm1637", "tm1638", "led", "hal"]
 
 [dependencies]
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
