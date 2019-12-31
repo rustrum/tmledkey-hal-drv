@@ -18,14 +18,14 @@
 //!
 //! # Features
 //!
-//! Plenty functionality of this library are splitted into features.
+//! Some functionality of this library are splitted into features.
 //! I hope that it may help to reduce resulted firmware size.
 //!
-//! - *cldkio* - functions to work with 2 wire interfaces
-//! - *clkdiostb* - functions to work with 3 wire interfaces
-//! - *keys* - key scan support
-//! - *fx* - stands for *fx* module
-//! - *utils* - stands for *utils* module
+//! - **cldkio** - functions to work with 2 wire interfaces
+//! - **clkdiostb** - functions to work with 3 wire interfaces
+//! - **keys** - key scan support
+//! - **fx** - tiny effects api (depends on "galloc")
+//! - **galloc** - functionality that require to have global allocator in your application
 //!
 //! You should look into Cargo.toml in [source code](https://github.com/rust-rum/tmledkey-hal-drv)
 //! to get better understanding how does this features combined together.
@@ -46,7 +46,7 @@
 //!
 #![no_std]
 #![allow(non_upper_case_globals)]
-#[cfg(feature = "alloc")]
+#[cfg(feature = "galloc")]
 extern crate alloc;
 
 pub mod utils;

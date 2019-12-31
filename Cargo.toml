@@ -20,7 +20,7 @@ embedded-hal = { version = "0.2.3", features = ["unproven"] }
 default=["clkdio", "clkdiostb"]
 
 # Global allocator functions
-alloc=[]
+galloc=[]
 
 # Enable key scan functionality (reading data)
 keys=[]
@@ -32,7 +32,7 @@ clkdio=[]
 clkdiostb=[]
 
 # Add animation effects helpers
-fx=["alloc"]
+fx=["galloc"]
 
 # Demo code that you probably would not be needeed for production code
-demo=["clkdio", "clkdiostb", "keys", "fx", "alloc"]
+demo=["clkdio", "clkdiostb", "keys", "fx"]

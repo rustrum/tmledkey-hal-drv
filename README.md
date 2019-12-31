@@ -32,9 +32,10 @@ Hardware crate was tested on:
 Current functionality looks stable, but implementation is extremely low level.
 That is mostly because I see no reason to do more friendly API 
 until HAL and it's implementations would stabilize.
-So right now my basic goal is to keep it stable and working between HAL updates.
-I really do hope that is it not a big issue because current HAL state with embedded programming 
-is only for hardcore crazy masochist developers which should be OK with what I've done here.
+Right now my goal is to keep it stable and working between HAL updates.
+
+I really do hope that complexity of API is not a big issue. Current HAL state and embedded programming 
+is suited only for hardcore, crazy, masochist developers who should be OK with my code.
 
 # Examples
 

@@ -1,11 +1,11 @@
 //! Helpful functions to work with MCUs raw data.
 //!
-//! Utility functions are depended on `Vec` which is require you
+//! Some utility functions are depended on `Vec` which is require you
 //! to have properly configure global memory allocator.
 //!
 //! If you are developing for embedded devices
 //! than you probably does not have global memory allocator by default.
-#[cfg(feature = "alloc")]
+#[cfg(feature = "galloc")]
 use alloc::vec::Vec;
 use core::ops::Deref;
 
@@ -14,6 +14,7 @@ use super::{CHAR_MINUS, DIGITS, SEG_8};
 const INT_CONVERT_MAX_SIZE: usize = 11;
 
 /// Represents conversion result from integer to 8 segment bytemask array.
+/// You could deref this structure as slice.
 #[derive(Debug)]
 pub struct IntConvertResult {
     offset: usize,
@@ -93,6 +94,7 @@ impl Deref for IntConvertResult {
 }
 
 /// Represents conversion result from float/double to 8 segment bytemask array.
+/// You could deref this structure as slice.
 #[derive(Debug)]
 pub struct DoubleConvertResult {
     offset: usize,
@@ -219,7 +221,9 @@ fn fractional_part_to_bytes(value: f32, precision: u8) -> IntConvertResult {
 
 /// Duplicate amount of bytes by adding 0 byte after each input byte.
 /// Can be used for 3 wire interfaces with TM1638 where 2 bytes used to write display state.
-#[cfg(feature = "alloc")]
+///
+/// This method **require "galloc"** feature to be enabled.
+#[cfg(feature = "galloc")]
 pub fn double_bytes(input: &[u8]) -> Vec<u8> {
     let mut double_byte = Vec::<u8>::new();
     for i in 0..input.len() {
@@ -330,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
+    #[cfg(feature = "galloc")]
     fn double_bytes_test() {
         let input: [u8; 4] = [1, 2, 3, 4];
         let check: [u8; 8] = [1, 0, 2, 0, 3, 0, 4, 0];
