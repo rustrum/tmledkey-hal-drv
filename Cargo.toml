@@ -1,10 +1,10 @@
 [package]
 name = "tmledkey-hal-drv"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Rumato Estorsky"]
 edition = "2018"
 description = "HAL based driver for Titan Micro 7 segment LED controllers and key scanners"
-repository = "https://github.com/rust-rum/tmledkey-hal-drv"
+repository = "https://github.com/rustrum/tmledkey-hal-drv"
 documentation = "https://docs.rs/tmledkey-hal-drv"
 license-file = "LICENSE"
 readme = "README.md"

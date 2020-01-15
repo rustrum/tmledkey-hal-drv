@@ -9,7 +9,7 @@ doctest = false
 dioclkstb=[]
 
 [dependencies]
-tmledkey-hal-drv = { version="0.1.0", path  = "../../", features = ["demo"] }
+tmledkey-hal-drv = { version="0.1.1", path  = "../../", features = ["demo"] }
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"

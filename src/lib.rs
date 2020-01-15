@@ -12,7 +12,7 @@
 //! In order to understand meaning of this bytes you should have some knowledges.
 //!
 //! # Need code examples?
-//! Just explore repository [examples folder](https://github.com/rust-rum/tmledkey-hal-drv).
+//! Just explore repository [examples folder](https://github.com/rustrum/tmledkey-hal-drv).
 //!
 //! *I just have no capacity to maintain actual code samples in every place.*
 //!
@@ -27,7 +27,7 @@
 //! - **fx** - tiny effects api (depends on "galloc")
 //! - **galloc** - functionality that require to have global allocator in your application
 //!
-//! You should look into Cargo.toml in [source code](https://github.com/rust-rum/tmledkey-hal-drv)
+//! You should look into Cargo.toml in [source code](https://github.com/rustrum/tmledkey-hal-drv)
 //! to get better understanding how does this features combined together.
 //!
 //! # Handling delays

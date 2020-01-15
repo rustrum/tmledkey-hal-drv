@@ -43,9 +43,9 @@ This is how code from examples works.
 
 Click on image to view animation.
 
-<a href="https://rust-rum.github.io/tmledkey-hal-drv/tm1637.gif" target="_blank"><img alt="TM1637 example" src="https://rust-rum.github.io/tmledkey-hal-drv/tm1637.jpg" /></a>
+<a href="https://rustrum.github.io/tmledkey-hal-drv/tm1637.gif" target="_blank"><img alt="TM1637 example" src="https://rustrum.github.io/tmledkey-hal-drv/tm1637.jpg" /></a>
 
-<a href="https://rust-rum.github.io/tmledkey-hal-drv/tm1638.gif" target="_blank"><img  alt="TM1638 example" src="https://rust-rum.github.io/tmledkey-hal-drv/tm1638.jpg" /></a>
+<a href="https://rustrum.github.io/tmledkey-hal-drv/tm1638.gif" target="_blank"><img  alt="TM1638 example" src="https://rustrum.github.io/tmledkey-hal-drv/tm1638.jpg" /></a>
 
 # Licensing
 This product is licenses under **almost MIT license** but with plumbus exception.
